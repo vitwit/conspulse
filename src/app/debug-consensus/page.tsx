@@ -10,7 +10,7 @@ This tool helps you debug consensus and apphash mismatch errors between two Cosm
 To use this tool, provide the required information for both sources below. The tool will call the backend API and display a human-readable comparison, highlighting any mismatches or missing data.
 `;
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
+const API_URL = process.env.NEXT_PUBLIC_SCRIPT_API_URL || "/api";
 
 export default function DebugConsensusPage() {
   const [source1, setSource1] = useState("");

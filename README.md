@@ -37,9 +37,22 @@ npm run dev
 ```
 Visit [http://localhost:3000](http://localhost:3000) in your browser.
 
+### Running the IAVLViewer Backend
+The dashboard can connect to a Go-based backend for comparing Cosmos SDK node databases (for consensus/apphash debugging).
+
+To run the backend server:
+```sh
+cd scripts/iavlviewer
+./iavlviewer --server --port=8080
+```
+- The API will be available at `http://localhost:8080/compare`.
+- Verify the API at `http://localhost:8080/health`.
+- You can change the port as needed.
+
 ## Environment Variables
 - `NEXT_PUBLIC_RPC_URL`: Tendermint RPC endpoint (must support `/consensus_state` and `/validators?height=`)
 - `NEXT_PUBLIC_NETWORK_NAME`: Name of the network (displayed in the UI)
+- `NEXT_PUBLIC_SCRIPT_API_URL`: URL of the iavlviewer backend (e.g. `http://localhost:8080`)
 
 ## Contact & Support
 - Email: [contact@vitwit.com](mailto:contact@vitwit.com)
