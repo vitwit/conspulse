@@ -18,7 +18,7 @@ export default function Navbar() {
           <Link href="/">
             <img src="/conspulse-logo.svg" alt="Conspulse Logo" className="h-9 w-9 cursor-pointer" />
           </Link>
-          <Link href="/" className="font-bold text-xl tracking-wide text-blue-700 hover:underline cursor-pointer">
+          <Link href="/" className="font-bold text-xl tracking-wide text-blue-700 hover:no-underline cursor-pointer">
             Conspulse
           </Link>
         </div>
