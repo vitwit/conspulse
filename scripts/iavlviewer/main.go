@@ -1,75 +1,525 @@
 package main
 
 import (
-	"archive/tar"
 	"archive/zip"
 	"bytes"
-	"compress/gzip"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
-	"reflect"
+	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"cosmossdk.io/log"
 	"cosmossdk.io/store"
 	"cosmossdk.io/store/metrics"
 	"cosmossdk.io/store/rootmulti"
+	storetypes "cosmossdk.io/store/types"
 	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/iavl"
 )
 
+// Request/Response structures for API
+type CompareRequest struct {
+	Source1 DataSourceRequest `json:"source1"`
+	Source2 DataSourceRequest `json:"source2"`
+	Options CompareOptions    `json:"options,omitempty"`
+}
+
+type DataSourceRequest struct {
+	Type string `json:"type"` // "local", "zip_file", "zip_url", "upload"
+	Path string `json:"path,omitempty"`
+	URL  string `json:"url,omitempty"`
+	Data []byte `json:"data,omitempty"` // For file uploads
+	Name string `json:"name,omitempty"` // Original filename for uploads
+}
+
+type CompareOptions struct {
+	MaxDiffsPerStore   int  `json:"max_diffs_per_store,omitempty"`
+	ShowMatchingStores bool `json:"show_matching_stores,omitempty"`
+	DetailedOutput     bool `json:"detailed_output,omitempty"`
+}
+
+type CompareResponse struct {
+	Success  bool              `json:"success"`
+	Error    string            `json:"error,omitempty"`
+	Summary  ComparisonSummary `json:"summary"`
+	Results  []StoreComparison `json:"results"`
+	Metadata ResponseMetadata  `json:"metadata"`
+}
+
+type ComparisonSummary struct {
+	TotalStores     int  `json:"total_stores"`
+	MatchingStores  int  `json:"matching_stores"`
+	DifferingStores int  `json:"differing_stores"`
+	MissingStores   int  `json:"missing_stores"`
+	IsIdentical     bool `json:"is_identical"`
+}
+
+type StoreComparison struct {
+	Name        string            `json:"name"`
+	Status      string            `json:"status"` // "match", "differ", "missing_source1", "missing_source2"
+	Hash1       string            `json:"hash1,omitempty"`
+	Hash2       string            `json:"hash2,omitempty"`
+	StoreType1  string            `json:"store_type1,omitempty"`
+	StoreType2  string            `json:"store_type2,omitempty"`
+	Differences []StoreDifference `json:"differences,omitempty"`
+	SampleData  *StoreSampleData  `json:"sample_data,omitempty"`
+	Extra       string            `json:"extra,omitempty"`
+}
+
+type StoreDifference struct {
+	Type        string `json:"type"` // "key_only_source1", "key_only_source2", "value_differ"
+	Key         string `json:"key"`
+	KeyHex      string `json:"key_hex"`
+	Value1      string `json:"value1,omitempty"`
+	Value1Hex   string `json:"value1_hex,omitempty"`
+	Value2      string `json:"value2,omitempty"`
+	Value2Hex   string `json:"value2_hex,omitempty"`
+	Description string `json:"description"`
+}
+
+type StoreSampleData struct {
+	Source     string      `json:"source"` // "source1" or "source2"
+	KeyCount   int         `json:"key_count"`
+	SampleKeys []SampleKey `json:"sample_keys"`
+}
+
+type SampleKey struct {
+	Key    string `json:"key"`
+	KeyHex string `json:"key_hex"`
+}
+
+type ResponseMetadata struct {
+	Source1Version int64  `json:"source1_version"`
+	Source2Version int64  `json:"source2_version"`
+	ComparisonTime string `json:"comparison_time"`
+	ProcessingTime string `json:"processing_time"`
+}
+
+type DataSource struct {
+	Path   string
+	IsTemp bool
+}
+
 func main() {
-	if len(os.Args) != 3 {
-		fmt.Println("Usage: compare_stores <data_dir_1|url> <data_dir_2|url>")
+	if len(os.Args) < 2 {
+		fmt.Println("Usage:")
+		fmt.Println("  CLI mode: compare_stores <source1> <source2> [--json]")
+		fmt.Println("  Web API mode: compare_stores --server [--port=8080]")
+		fmt.Println()
+		fmt.Println("Sources can be:")
+		fmt.Println("  - Local directory path")
+		fmt.Println("  - ZIP file path")
+		fmt.Println("  - HTTP/HTTPS URL to ZIP file")
 		os.Exit(1)
 	}
 
-	dir1, cleanup1, err := getLocalOrDownload(os.Args[1])
-	if err != nil {
-		panic(err)
+	if os.Args[1] == "--server" {
+		startWebServer()
+		return
 	}
-	defer cleanup1()
 
-	dir2, cleanup2, err := getLocalOrDownload(os.Args[2])
-	if err != nil {
-		panic(err)
+	// CLI mode
+	if len(os.Args) < 3 {
+		fmt.Println("CLI mode requires two sources")
+		os.Exit(1)
 	}
-	defer cleanup2()
 
-	db1, err := dbm.NewDB("application", dbm.GoLevelDBBackend, dir1)
+	jsonOutput := len(os.Args) > 3 && os.Args[3] == "--json"
+	runCLIComparison(os.Args[1], os.Args[2], jsonOutput)
+}
+
+func startWebServer() {
+	port := "8080"
+	for _, arg := range os.Args {
+		if strings.HasPrefix(arg, "--port=") {
+			port = strings.TrimPrefix(arg, "--port=")
+		}
+	}
+
+	http.HandleFunc("/compare", handleCompareAPI)
+	http.HandleFunc("/health", handleHealth)
+
+	fmt.Printf("Starting store comparison API server on port %s\n", port)
+	fmt.Printf("Endpoints:\n")
+	fmt.Printf("  POST /compare - Compare two data sources\n")
+	fmt.Printf("  GET  /health  - Health check\n")
+
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
+		fmt.Printf("Server failed to start: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// Add CORS helper
+func setCORSHeaders(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+}
+
+func handleHealth(w http.ResponseWriter, r *http.Request) {
+	setCORSHeaders(w)
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	fmt.Printf("[Health] %s %s from %s\n", r.Method, r.URL.Path, r.RemoteAddr)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "healthy",
+		"service": "store-comparison-api",
+		"version": "1.0.0",
+	})
+}
+
+func handleCompareAPI(w http.ResponseWriter, r *http.Request) {
+	setCORSHeaders(w)
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	fmt.Printf("[Compare] %s %s from %s\n", r.Method, r.URL.Path, r.RemoteAddr)
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(CompareResponse{
+			Success: false,
+			Error:   "Method not allowed. Use POST.",
+		})
+		return
+	}
+
+	// Log request body for POST
+	var bodyCopy bytes.Buffer
+	tee := io.TeeReader(r.Body, &bodyCopy)
+	var req CompareRequest
+	if err := json.NewDecoder(tee).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(CompareResponse{
+			Success: false,
+			Error:   fmt.Sprintf("Invalid request body: %v", err),
+		})
+		return
+	}
+	fmt.Printf("[Compare] Request body: %s\n", bodyCopy.String())
+
+	// Set default options
+	if req.Options.MaxDiffsPerStore == 0 {
+		req.Options.MaxDiffsPerStore = 5
+	}
+
+	response := performComparison(req)
+
+	if !response.Success {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+func runCLIComparison(source1, source2 string, jsonOutput bool) {
+	req := CompareRequest{
+		Source1: DataSourceRequest{
+			Type: detectSourceType(source1),
+			Path: source1,
+			URL:  source1,
+		},
+		Source2: DataSourceRequest{
+			Type: detectSourceType(source2),
+			Path: source2,
+			URL:  source2,
+		},
+		Options: CompareOptions{
+			MaxDiffsPerStore:   5,
+			ShowMatchingStores: true,
+			DetailedOutput:     true,
+		},
+	}
+
+	response := performComparison(req)
+
+	if jsonOutput {
+		output, _ := json.MarshalIndent(response, "", "  ")
+		fmt.Println(string(output))
+	} else {
+		// Open the DBs and multistores for tree shape diff
+		db1, err1 := dbm.NewDB("application", dbm.GoLevelDBBackend, source1)
+		db2, err2 := dbm.NewDB("application", dbm.GoLevelDBBackend, source2)
+		var ms1, ms2 *rootmulti.Store
+		if err1 == nil && err2 == nil {
+			ms1 = store.NewCommitMultiStore(db1, log.NewNopLogger(), metrics.NewNoOpMetrics()).(*rootmulti.Store)
+			ms2 = store.NewCommitMultiStore(db2, log.NewNopLogger(), metrics.NewNoOpMetrics()).(*rootmulti.Store)
+			ver1 := ms1.LatestVersion()
+			ver2 := ms2.LatestVersion()
+			ms1.LoadVersion(ver1)
+			ms2.LoadVersion(ver2)
+		}
+		printCLIOutput(response, ms1, ms2)
+		if db1 != nil {
+			db1.Close()
+		}
+		if db2 != nil {
+			db2.Close()
+		}
+	}
+
+	if !response.Success {
+		os.Exit(1)
+	}
+}
+
+func detectSourceType(source string) string {
+	if strings.HasPrefix(source, "http://") || strings.HasPrefix(source, "https://") {
+		return "zip_url"
+	}
+	if strings.HasSuffix(strings.ToLower(source), ".zip") {
+		return "zip_file"
+	}
+	return "local"
+}
+
+func performComparison(req CompareRequest) CompareResponse {
+	startTime := time.Now()
+
+	response := CompareResponse{
+		Success: true,
+		Metadata: ResponseMetadata{
+			ComparisonTime: time.Now().UTC().Format(time.RFC3339),
+		},
+	}
+
+	// Prepare data sources
+	source1, err := prepareDataSourceFromRequest(req.Source1)
 	if err != nil {
-		panic(err)
+		response.Success = false
+		response.Error = fmt.Sprintf("Error preparing source1: %v", err)
+		return response
+	}
+	defer cleanupSource(source1)
+
+	source2, err := prepareDataSourceFromRequest(req.Source2)
+	if err != nil {
+		response.Success = false
+		response.Error = fmt.Sprintf("Error preparing source2: %v", err)
+		return response
+	}
+	defer cleanupSource(source2)
+
+	// Perform comparison
+	result, err := compareStoresForAPI(source1.Path, source2.Path, req.Options)
+	if err != nil {
+		response.Success = false
+		response.Error = fmt.Sprintf("Comparison failed: %v", err)
+		return response
+	}
+
+	response.Summary = result.Summary
+	response.Results = result.Results
+	response.Metadata.Source1Version = result.Metadata.Source1Version
+	response.Metadata.Source2Version = result.Metadata.Source2Version
+	response.Metadata.ProcessingTime = time.Since(startTime).String()
+
+	return response
+}
+
+func prepareDataSourceFromRequest(req DataSourceRequest) (*DataSource, error) {
+	switch req.Type {
+	case "local":
+		if _, err := os.Stat(req.Path); err != nil {
+			return nil, fmt.Errorf("local path does not exist: %s", req.Path)
+		}
+		return &DataSource{Path: req.Path, IsTemp: false}, nil
+
+	case "zip_file":
+		return extractLocalZip(req.Path)
+
+	case "zip_url":
+		return downloadAndExtractZip(req.URL)
+
+	case "upload":
+		return extractUploadedZip(req.Data, req.Name)
+
+	default:
+		return nil, fmt.Errorf("unsupported source type: %s", req.Type)
+	}
+}
+
+func extractUploadedZip(data []byte, filename string) (*DataSource, error) {
+	tempDir, err := os.MkdirTemp("", "store-compare-upload-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp directory: %v", err)
+	}
+
+	extractDir := filepath.Join(tempDir, "extracted")
+	err = extractZipFromBytes(data, extractDir)
+	if err != nil {
+		os.RemoveAll(tempDir)
+		return nil, fmt.Errorf("failed to extract uploaded ZIP: %v", err)
+	}
+
+	return &DataSource{Path: extractDir, IsTemp: true}, nil
+}
+
+func downloadAndExtractZip(url string) (*DataSource, error) {
+	tempDir, err := os.MkdirTemp("", "store-compare-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp directory: %v", err)
+	}
+
+	client := &http.Client{Timeout: 30 * time.Minute}
+	resp, err := client.Get(url)
+	if err != nil {
+		os.RemoveAll(tempDir)
+		return nil, fmt.Errorf("failed to download ZIP: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		os.RemoveAll(tempDir)
+		return nil, fmt.Errorf("failed to download ZIP: HTTP %d", resp.StatusCode)
+	}
+
+	zipData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		os.RemoveAll(tempDir)
+		return nil, fmt.Errorf("failed to read ZIP data: %v", err)
+	}
+
+	extractDir := filepath.Join(tempDir, "extracted")
+	err = extractZipFromBytes(zipData, extractDir)
+	if err != nil {
+		os.RemoveAll(tempDir)
+		return nil, fmt.Errorf("failed to extract ZIP: %v", err)
+	}
+
+	return &DataSource{Path: extractDir, IsTemp: true}, nil
+}
+
+func extractLocalZip(zipPath string) (*DataSource, error) {
+	tempDir, err := os.MkdirTemp("", "store-compare-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp directory: %v", err)
+	}
+
+	zipData, err := os.ReadFile(zipPath)
+	if err != nil {
+		os.RemoveAll(tempDir)
+		return nil, fmt.Errorf("failed to read ZIP file: %v", err)
+	}
+
+	extractDir := filepath.Join(tempDir, "extracted")
+	err = extractZipFromBytes(zipData, extractDir)
+	if err != nil {
+		os.RemoveAll(tempDir)
+		return nil, fmt.Errorf("failed to extract ZIP: %v", err)
+	}
+
+	return &DataSource{Path: extractDir, IsTemp: true}, nil
+}
+
+func extractZipFromBytes(zipData []byte, destDir string) error {
+	reader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
+	if err != nil {
+		return err
+	}
+
+	err = os.MkdirAll(destDir, 0755)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range reader.File {
+		path := filepath.Join(destDir, file.Name)
+
+		if !strings.HasPrefix(path, filepath.Clean(destDir)+string(os.PathSeparator)) {
+			return fmt.Errorf("invalid file path in ZIP: %s", file.Name)
+		}
+
+		if file.FileInfo().IsDir() {
+			os.MkdirAll(path, file.FileInfo().Mode())
+			continue
+		}
+
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			return err
+		}
+
+		fileReader, err := file.Open()
+		if err != nil {
+			return err
+		}
+
+		targetFile, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.FileInfo().Mode())
+		if err != nil {
+			fileReader.Close()
+			return err
+		}
+
+		_, err = io.Copy(targetFile, fileReader)
+		fileReader.Close()
+		targetFile.Close()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func cleanupSource(source *DataSource) {
+	if source.IsTemp {
+		os.RemoveAll(source.Path)
+	}
+}
+
+type ComparisonResult struct {
+	Summary  ComparisonSummary
+	Results  []StoreComparison
+	Metadata ResponseMetadata
+}
+
+func compareStoresForAPI(dataDir1, dataDir2 string, options CompareOptions) (*ComparisonResult, error) {
+	// Open databases
+	db1, err := dbm.NewDB("application", dbm.GoLevelDBBackend, dataDir1)
+	if err != nil {
+		return nil, fmt.Errorf("error opening database in %s: %v", dataDir1, err)
 	}
 	defer db1.Close()
 
-	db2, err := dbm.NewDB("application", dbm.GoLevelDBBackend, dir2)
+	db2, err := dbm.NewDB("application", dbm.GoLevelDBBackend, dataDir2)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("error opening database in %s: %v", dataDir2, err)
 	}
 	defer db2.Close()
 
-	// Load commit multi-store for each
+	// Load multistores
 	ms1 := store.NewCommitMultiStore(db1, log.NewNopLogger(), metrics.NewNoOpMetrics()).(*rootmulti.Store)
 	ms2 := store.NewCommitMultiStore(db2, log.NewNopLogger(), metrics.NewNoOpMetrics()).(*rootmulti.Store)
 
 	ver1 := ms1.LatestVersion()
 	ver2 := ms2.LatestVersion()
-	fmt.Printf("DataDir1 LatestVersion: %d\n", ver1)
-	fmt.Printf("DataDir2 LatestVersion: %d\n", ver2)
 
+	// Get commit info
 	commitInfo1, err := ms1.GetCommitInfo(ver1)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("error getting commit info for source1: %v", err)
 	}
 	commitInfo2, err := ms2.GetCommitInfo(ver2)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("error getting commit info for source2: %v", err)
 	}
 
+	// Collect store hashes
 	stores1 := map[string][]byte{}
 	stores2 := map[string][]byte{}
 	for _, s := range commitInfo1.StoreInfos {
@@ -79,236 +529,528 @@ func main() {
 		stores2[s.Name] = s.GetHash()
 	}
 
-	// Union of all store names for easy reporting
-	allStores := map[string]bool{}
+	// Mount all stores
+	allStoreNames := make(map[string]bool)
 	for k := range stores1 {
-		allStores[k] = true
+		allStoreNames[k] = true
 	}
 	for k := range stores2 {
-		allStores[k] = true
+		allStoreNames[k] = true
 	}
 
+	for storeName := range allStoreNames {
+		storeType := storetypes.StoreTypeIAVL
+		ms1.MountStoreWithDB(storetypes.NewKVStoreKey(storeName), storeType, nil)
+		ms2.MountStoreWithDB(storetypes.NewKVStoreKey(storeName), storeType, nil)
+	}
+
+	// Load versions
+	ms1.LoadVersion(ver1)
+	ms2.LoadVersion(ver2)
+
+	// Prepare results
 	var names []string
-	for k := range allStores {
+	for k := range allStoreNames {
 		names = append(names, k)
 	}
 	sort.Strings(names)
 
-	fmt.Println("Store root hash comparison:")
+	var results []StoreComparison
+	summary := ComparisonSummary{}
+
 	for _, name := range names {
 		h1, ok1 := stores1[name]
 		h2, ok2 := stores2[name]
 
+		comparison := StoreComparison{Name: name}
+
 		switch {
 		case !ok1:
-			fmt.Printf("Store %s only in Dir2\n\n", name)
+			comparison.Status = "missing_source1"
+			comparison.Hash2 = fmt.Sprintf("%x", h2)
+			if options.DetailedOutput {
+				comparison.SampleData = getSampleData(ms2, name, "source2")
+			}
+			summary.MissingStores++
+
 		case !ok2:
-			fmt.Printf("Store %s only in Dir1\n\n", name)
+			comparison.Status = "missing_source2"
+			comparison.Hash1 = fmt.Sprintf("%x", h1)
+			if options.DetailedOutput {
+				comparison.SampleData = getSampleData(ms1, name, "source1")
+			}
+			summary.MissingStores++
+
 		case bytes.Equal(h1, h2):
-			//fmt.Printf("Store %s: hashes match: %x\n", name, h1)
+			comparison.Status = "match"
+			comparison.Hash1 = fmt.Sprintf("%x", h1)
+			comparison.Hash2 = fmt.Sprintf("%x", h2)
+			summary.MatchingStores++
+
 		default:
-			fmt.Printf("Store %s: hashes differ!\n  Dir1: %x\n  Dir2: %x\n\n", name, h1, h2)
-			// Try to dig into the IAVL tree!
-			findIAVLTreeDiff(ms1, ms2, name, ver1, ver2)
+			comparison.Status = "differ"
+			comparison.Hash1 = fmt.Sprintf("%x", h1)
+			comparison.Hash2 = fmt.Sprintf("%x", h2)
+			if options.DetailedOutput {
+				comparison.Differences = getStoreDifferences(ms1, ms2, name, options.MaxDiffsPerStore)
+				comparison.StoreType1 = getStoreType(ms1, name)
+				comparison.StoreType2 = getStoreType(ms2, name)
+			}
+			summary.DifferingStores++
+		}
+
+		if options.ShowMatchingStores || comparison.Status != "match" {
+			results = append(results, comparison)
+		}
+		summary.TotalStores++
+
+		if comparison.StoreType1 != "" && strings.Contains(strings.ToLower(comparison.StoreType1), "iavl") && comparison.Status == "differ" {
+			store1 := ms1.GetStoreByName(name)
+			store2 := ms2.GetStoreByName(name)
+			var tree1, tree2 *iavl.ImmutableTree
+			if t1, ok := store1.(interface{ GetImmutableTree() *iavl.ImmutableTree }); ok {
+				tree1 = t1.GetImmutableTree()
+			}
+			if t2, ok := store2.(interface{ GetImmutableTree() *iavl.ImmutableTree }); ok {
+				tree2 = t2.GetImmutableTree()
+			}
+			if tree1 != nil && tree2 != nil {
+				shape1 := getIAVLTreeShape(tree1)
+				shape2 := getIAVLTreeShape(tree2)
+				diffs := diffLines(shape1, shape2)
+				var sb strings.Builder
+				sb.WriteString("Tree Shape Diff (IAVL):\n")
+				for _, diff := range diffs {
+					sb.WriteString("  " + decodeHexInLine(diff) + "\n")
+				}
+				comparison.Extra = sb.String()
+			}
 		}
 	}
+
+	summary.IsIdentical = summary.MissingStores == 0 && summary.DifferingStores == 0
+
+	return &ComparisonResult{
+		Summary: summary,
+		Results: results,
+		Metadata: ResponseMetadata{
+			Source1Version: ver1,
+			Source2Version: ver2,
+		},
+	}, nil
 }
 
-func findIAVLTreeDiff(ms1, ms2 *rootmulti.Store, storeName string, ver1, ver2 int64) {
-	fmt.Printf("Checking store %s\n", storeName)
+func getSampleData(ms *rootmulti.Store, storeName, source string) *StoreSampleData {
+	store := ms.GetStoreByName(storeName)
+	if store == nil {
+		return nil
+	}
+
+	sampleData := &StoreSampleData{
+		Source:     source,
+		SampleKeys: []SampleKey{},
+	}
+
+	if kvStore, ok := store.(storetypes.KVStore); ok {
+		iter := kvStore.Iterator(nil, nil)
+		if iter != nil {
+			defer iter.Close()
+			count := 0
+			for ; iter.Valid() && count < 3; iter.Next() {
+				key := iter.Key()
+				sampleData.SampleKeys = append(sampleData.SampleKeys, SampleKey{
+					Key:    string(key),
+					KeyHex: fmt.Sprintf("%x", key),
+				})
+				count++
+			}
+		}
+	}
+
+	return sampleData
+}
+
+func getStoreType(ms *rootmulti.Store, storeName string) string {
+	store := ms.GetStoreByName(storeName)
+	if store == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("%T", store)
+}
+
+func getStoreDifferences(ms1, ms2 *rootmulti.Store, storeName string, maxDiffs int) []StoreDifference {
+	var differences []StoreDifference
 
 	s1 := ms1.GetStoreByName(storeName)
-	if s1 == nil {
-		fmt.Printf("  Store %s not found in Dir1 (ms1)\n", storeName)
-	}
 	s2 := ms2.GetStoreByName(storeName)
-	if s2 == nil {
-		fmt.Printf("  Store %s not found in Dir2 (ms2)\n", storeName)
+
+	if s1 == nil || s2 == nil {
+		return differences
 	}
 
-	// Only try for IAVL stores (not memory, transient, etc.)
-	t1, ok1 := s1.(interface{ GetImmutableTree() *iavl.ImmutableTree })
-	t2, ok2 := s2.(interface{ GetImmutableTree() *iavl.ImmutableTree })
-	if !ok1 || !ok2 {
-		fmt.Printf("  Cannot dig: store %s is not IAVL.\n", storeName)
-		fmt.Printf("    Dir1 store type: %T\n", s1)
-		fmt.Printf("    Dir2 store type: %T\n", s2)
-		fmt.Printf("    Dir1 concrete type: %v\n", reflect.TypeOf(s1))
-		fmt.Printf("    Dir2 concrete type: %v\n", reflect.TypeOf(s2))
-		return
+	// Try IAVL comparison
+	if t1, ok1 := s1.(interface{ GetImmutableTree() *iavl.ImmutableTree }); ok1 {
+		if t2, ok2 := s2.(interface{ GetImmutableTree() *iavl.ImmutableTree }); ok2 {
+			tree1 := t1.GetImmutableTree()
+			tree2 := t2.GetImmutableTree()
+			if tree1 != nil && tree2 != nil {
+				return compareIAVLTreesForAPI(tree1, tree2, maxDiffs)
+			}
+		}
 	}
 
-	tree1 := t1.GetImmutableTree()
-	tree2 := t2.GetImmutableTree()
+	// Fallback to KVStore comparison
+	if kv1, ok := s1.(storetypes.KVStore); ok {
+		if kv2, ok := s2.(storetypes.KVStore); ok {
+			return compareKVStoresForAPI(kv1, kv2, maxDiffs)
+		}
+	}
+
+	return differences
+}
+
+func compareIAVLTreesForAPI(tree1, tree2 *iavl.ImmutableTree, maxDiffs int) []StoreDifference {
+	var differences []StoreDifference
 
 	itr1, err := tree1.Iterator(nil, nil, true)
 	if err != nil {
-		fmt.Printf("  Error creating iterator for store %s in dir1: %v\n", storeName, err)
-		return
-	}
-	itr2, err := tree2.Iterator(nil, nil, true)
-	if err != nil {
-		fmt.Printf("  Error creating iterator for store %s in dir2: %v\n", storeName, err)
-		return
+		return differences
 	}
 	defer itr1.Close()
+
+	itr2, err := tree2.Iterator(nil, nil, true)
+	if err != nil {
+		return differences
+	}
 	defer itr2.Close()
 
-	for itr1.Valid() && itr2.Valid() {
+	diffCount := 0
+	for (itr1.Valid() || itr2.Valid()) && diffCount < maxDiffs {
+		if !itr1.Valid() {
+			k2, v2 := itr2.Key(), itr2.Value()
+			differences = append(differences, StoreDifference{
+				Type:        "key_only_source2",
+				Key:         string(k2),
+				KeyHex:      fmt.Sprintf("%x", k2),
+				Value2:      string(v2),
+				Value2Hex:   fmt.Sprintf("%x", v2),
+				Description: "Key exists only in source2",
+			})
+			diffCount++
+			itr2.Next()
+			continue
+		}
+
+		if !itr2.Valid() {
+			k1, v1 := itr1.Key(), itr1.Value()
+			differences = append(differences, StoreDifference{
+				Type:        "key_only_source1",
+				Key:         string(k1),
+				KeyHex:      fmt.Sprintf("%x", k1),
+				Value1:      string(v1),
+				Value1Hex:   fmt.Sprintf("%x", v1),
+				Description: "Key exists only in source1",
+			})
+			diffCount++
+			itr1.Next()
+			continue
+		}
+
 		k1, v1 := itr1.Key(), itr1.Value()
 		k2, v2 := itr2.Key(), itr2.Value()
 
-		if !bytes.Equal(k1, k2) {
-			fmt.Printf("  First differing key:\n    Dir1: %x\n    Dir2: %x\n", k1, k2)
-			return
-		}
-		if !bytes.Equal(v1, v2) {
-			fmt.Printf("  First differing value at key %x:\n    Dir1: %x\n    Dir2: %x\n", k1, v1, v2)
-			return
-		}
-		itr1.Next()
-		itr2.Next()
-	}
-
-	if itr1.Valid() || itr2.Valid() {
-		fmt.Println("  One store has more keys than the other")
-	} else {
-		fmt.Println("  Trees structure matches but root hash still differs (possible bug in IAVL or store versioning)")
-	}
-}
-
-func getLocalOrDownload(pathOrURL string) (string, func(), error) {
-	if strings.HasPrefix(pathOrURL, "http://") || strings.HasPrefix(pathOrURL, "https://") {
-		// Download
-		resp, err := http.Get(pathOrURL)
-		if err != nil {
-			return "", func() {}, fmt.Errorf("failed to download %s: %w", pathOrURL, err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			return "", func() {}, fmt.Errorf("failed to download %s: status %d", pathOrURL, resp.StatusCode)
-		}
-		// Create temp file
-		tmpFile, err := os.CreateTemp("", "conspulse_download_*")
-		if err != nil {
-			return "", func() {}, err
-		}
-		defer tmpFile.Close()
-		_, err = io.Copy(tmpFile, resp.Body)
-		if err != nil {
-			return "", func() {}, err
-		}
-		// Extract
-		tmpDir, err := os.MkdirTemp("", "conspulse_extract_*")
-		if err != nil {
-			return "", func() {}, err
-		}
-		// Detect file type
-		name := pathOrURL
-		if strings.HasSuffix(name, ".zip") {
-			err = unzip(tmpFile.Name(), tmpDir)
-		} else if strings.HasSuffix(name, ".tar.gz") || strings.HasSuffix(name, ".tgz") {
-			err = untarGz(tmpFile.Name(), tmpDir)
+		keyCompare := bytes.Compare(k1, k2)
+		if keyCompare < 0 {
+			differences = append(differences, StoreDifference{
+				Type:        "key_only_source1",
+				Key:         string(k1),
+				KeyHex:      fmt.Sprintf("%x", k1),
+				Value1:      string(v1),
+				Value1Hex:   fmt.Sprintf("%x", v1),
+				Description: "Key exists only in source1",
+			})
+			diffCount++
+			itr1.Next()
+		} else if keyCompare > 0 {
+			differences = append(differences, StoreDifference{
+				Type:        "key_only_source2",
+				Key:         string(k2),
+				KeyHex:      fmt.Sprintf("%x", k2),
+				Value2:      string(v2),
+				Value2Hex:   fmt.Sprintf("%x", v2),
+				Description: "Key exists only in source2",
+			})
+			diffCount++
+			itr2.Next()
 		} else {
-			return "", func() {}, fmt.Errorf("unsupported archive type: %s", name)
+			if !bytes.Equal(v1, v2) {
+				differences = append(differences, StoreDifference{
+					Type:        "value_differ",
+					Key:         string(k1),
+					KeyHex:      fmt.Sprintf("%x", k1),
+					Value1:      string(v1),
+					Value1Hex:   fmt.Sprintf("%x", v1),
+					Value2:      string(v2),
+					Value2Hex:   fmt.Sprintf("%x", v2),
+					Description: "Values differ for the same key",
+				})
+				diffCount++
+			}
+			itr1.Next()
+			itr2.Next()
 		}
-		if err != nil {
-			return "", func() {}, err
-		}
-		cleanup := func() {
-			os.RemoveAll(tmpDir)
-			os.Remove(tmpFile.Name())
-		}
-		// Find the first directory in tmpDir (assume archive extracts to a single dir)
-		entries, err := os.ReadDir(tmpDir)
-		if err != nil || len(entries) == 0 {
-			return "", cleanup, fmt.Errorf("no files extracted from archive")
-		}
-		first := filepath.Join(tmpDir, entries[0].Name())
-		info, err := os.Stat(first)
-		if err == nil && info.IsDir() {
-			return first, cleanup, nil
-		}
-		return tmpDir, cleanup, nil
 	}
-	// Local path
-	return pathOrURL, func() {}, nil
+
+	return differences
 }
 
-func unzip(src, dest string) error {
-	r, err := zip.OpenReader(src)
-	if err != nil {
-		return err
+func compareKVStoresForAPI(kv1, kv2 storetypes.KVStore, maxDiffs int) []StoreDifference {
+	var differences []StoreDifference
+
+	iter1 := kv1.Iterator(nil, nil)
+	if iter1 == nil {
+		return differences
 	}
-	defer r.Close()
-	for _, f := range r.File {
-		fpath := filepath.Join(dest, f.Name)
-		if f.FileInfo().IsDir() {
-			os.MkdirAll(fpath, 0755)
+	defer iter1.Close()
+
+	iter2 := kv2.Iterator(nil, nil)
+	if iter2 == nil {
+		return differences
+	}
+	defer iter2.Close()
+
+	diffCount := 0
+	for (iter1.Valid() || iter2.Valid()) && diffCount < maxDiffs {
+		if !iter1.Valid() {
+			k2, v2 := iter2.Key(), iter2.Value()
+			differences = append(differences, StoreDifference{
+				Type:        "key_only_source2",
+				Key:         string(k2),
+				KeyHex:      fmt.Sprintf("%x", k2),
+				Value2:      string(v2),
+				Value2Hex:   fmt.Sprintf("%x", v2),
+				Description: "Key exists only in source2",
+			})
+			diffCount++
+			iter2.Next()
 			continue
 		}
-		if err := os.MkdirAll(filepath.Dir(fpath), 0755); err != nil {
-			return err
+
+		if !iter2.Valid() {
+			k1, v1 := iter1.Key(), iter1.Value()
+			differences = append(differences, StoreDifference{
+				Type:        "key_only_source1",
+				Key:         string(k1),
+				KeyHex:      fmt.Sprintf("%x", k1),
+				Value1:      string(v1),
+				Value1Hex:   fmt.Sprintf("%x", v1),
+				Description: "Key exists only in source1",
+			})
+			diffCount++
+			iter1.Next()
+			continue
 		}
-		outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-		if err != nil {
-			return err
-		}
-		rc, err := f.Open()
-		if err != nil {
-			outFile.Close()
-			return err
-		}
-		_, err = io.Copy(outFile, rc)
-		outFile.Close()
-		rc.Close()
-		if err != nil {
-			return err
+
+		k1, v1 := iter1.Key(), iter1.Value()
+		k2, v2 := iter2.Key(), iter2.Value()
+
+		keyCompare := bytes.Compare(k1, k2)
+		if keyCompare < 0 {
+			differences = append(differences, StoreDifference{
+				Type:        "key_only_source1",
+				Key:         string(k1),
+				KeyHex:      fmt.Sprintf("%x", k1),
+				Value1:      string(v1),
+				Value1Hex:   fmt.Sprintf("%x", v1),
+				Description: "Key exists only in source1",
+			})
+			diffCount++
+			iter1.Next()
+		} else if keyCompare > 0 {
+			differences = append(differences, StoreDifference{
+				Type:        "key_only_source2",
+				Key:         string(k2),
+				KeyHex:      fmt.Sprintf("%x", k2),
+				Value2:      string(v2),
+				Value2Hex:   fmt.Sprintf("%x", v2),
+				Description: "Key exists only in source2",
+			})
+			diffCount++
+			iter2.Next()
+		} else {
+			if !bytes.Equal(v1, v2) {
+				differences = append(differences, StoreDifference{
+					Type:        "value_differ",
+					Key:         string(k1),
+					KeyHex:      fmt.Sprintf("%x", k1),
+					Value1:      string(v1),
+					Value1Hex:   fmt.Sprintf("%x", v1),
+					Value2:      string(v2),
+					Value2Hex:   fmt.Sprintf("%x", v2),
+					Description: "Values differ for the same key",
+				})
+				diffCount++
+			}
+			iter1.Next()
+			iter2.Next()
 		}
 	}
-	return nil
+
+	return differences
 }
 
-func untarGz(src, dest string) error {
-	f, err := os.Open(src)
-	if err != nil {
-		return err
+func printCLIOutput(response CompareResponse, ms1, ms2 *rootmulti.Store) {
+	if !response.Success {
+		fmt.Printf("❌ Comparison failed: %s\n", response.Error)
+		return
 	}
-	defer f.Close()
-	gz, err := gzip.NewReader(f)
-	if err != nil {
-		return err
-	}
-	defer gz.Close()
-	tr := tar.NewReader(gz)
-	for {
-		hdr, err := tr.Next()
-		if err == io.EOF {
-			break
+
+	fmt.Printf("\n===== Store Comparison Result =====\n")
+	fmt.Printf("Source1 LatestVersion: %d\n", response.Metadata.Source1Version)
+	fmt.Printf("Source2 LatestVersion: %d\n", response.Metadata.Source2Version)
+	fmt.Printf("Comparison Time: %s\n", response.Metadata.ComparisonTime)
+	fmt.Printf("Processing Time: %s\n", response.Metadata.ProcessingTime)
+	fmt.Printf("\n--- Summary ---\n")
+	fmt.Printf("Total Stores:      %d\n", response.Summary.TotalStores)
+	fmt.Printf("Matching Stores:   %d\n", response.Summary.MatchingStores)
+	fmt.Printf("Differing Stores:  %d\n", response.Summary.DifferingStores)
+	fmt.Printf("Missing Stores:    %d\n", response.Summary.MissingStores)
+	fmt.Printf("Is Identical:      %v\n", response.Summary.IsIdentical)
+
+	fmt.Printf("\n--- Store Results ---\n")
+	for _, res := range response.Results {
+		statusIcon := map[string]string{
+			"match":           "✅",
+			"differ":          "❌",
+			"missing_source1": "⬅️  (missing in source1)",
+			"missing_source2": "➡️  (missing in source2)",
+		}[res.Status]
+		if statusIcon == "" {
+			statusIcon = res.Status
 		}
+		fmt.Printf("\n%s Store: %s\n", statusIcon, res.Name)
+		if res.Hash1 != "" {
+			fmt.Printf("  Hash1: %s\n", res.Hash1)
+		}
+		if res.Hash2 != "" {
+			fmt.Printf("  Hash2: %s\n", res.Hash2)
+		}
+		if res.StoreType1 != "" {
+			fmt.Printf("  StoreType1: %s\n", res.StoreType1)
+		}
+		if res.StoreType2 != "" {
+			fmt.Printf("  StoreType2: %s\n", res.StoreType2)
+		}
+		if res.SampleData != nil {
+			fmt.Printf("  SampleData (%s):\n", res.SampleData.Source)
+			fmt.Printf("    KeyCount: %d\n", res.SampleData.KeyCount)
+			if len(res.SampleData.SampleKeys) > 0 {
+				fmt.Printf("    Sample Keys:\n")
+				for _, sk := range res.SampleData.SampleKeys {
+					fmt.Printf("      - Key: '%s' (hex: %s)\n", sk.Key, sk.KeyHex)
+				}
+			}
+		}
+		if len(res.Differences) > 0 {
+			fmt.Printf("  Differences (showing up to %d):\n", len(res.Differences))
+			for i, diff := range res.Differences {
+				fmt.Printf("    %d. [%s] Key: '%s' (hex: %s)\n", i+1, diff.Type, diff.Key, diff.KeyHex)
+				if diff.Value1 != "" {
+					fmt.Printf("       Value1: '%s' (hex: %s)\n", diff.Value1, diff.Value1Hex)
+				}
+				if diff.Value2 != "" {
+					fmt.Printf("       Value2: '%s' (hex: %s)\n", diff.Value2, diff.Value2Hex)
+				}
+				fmt.Printf("       Description: %s\n", diff.Description)
+			}
+			// Show tree shape diff for IAVL stores
+			if res.StoreType1 != "" && strings.Contains(strings.ToLower(res.StoreType1), "iavl") && res.Status == "differ" {
+				fmt.Printf("  Tree Shape Diff (IAVL):\n")
+				store1 := ms1.GetStoreByName(res.Name)
+				store2 := ms2.GetStoreByName(res.Name)
+				var tree1, tree2 *iavl.ImmutableTree
+				if t1, ok := store1.(interface{ GetImmutableTree() *iavl.ImmutableTree }); ok {
+					tree1 = t1.GetImmutableTree()
+				}
+				if t2, ok := store2.(interface{ GetImmutableTree() *iavl.ImmutableTree }); ok {
+					tree2 = t2.GetImmutableTree()
+				}
+				if tree1 != nil && tree2 != nil {
+					shape1 := getIAVLTreeShape(tree1)
+					shape2 := getIAVLTreeShape(tree2)
+					diffs := diffLines(shape1, shape2)
+					for _, diff := range diffs {
+						fmt.Printf("    %s\n", decodeHexInLine(diff))
+					}
+				}
+			}
+		}
+	}
+	fmt.Printf("\n===================================\n\n")
+}
+
+// Refactor getIAVLTreeShape to use the iterator API
+func getIAVLTreeShape(tree *iavl.ImmutableTree) []string {
+	var lines []string
+	itr, err := tree.Iterator(nil, nil, true)
+	if err != nil {
+		return lines
+	}
+	defer itr.Close()
+	for ; itr.Valid(); itr.Next() {
+		lines = append(lines, fmt.Sprintf("key=%x value=%x", itr.Key(), itr.Value()))
+	}
+	return lines
+}
+
+// Add a function to diff two string slices (line-by-line)
+func diffLines(a, b []string) []string {
+	var diffs []string
+	alen, blen := len(a), len(b)
+	max := alen
+	if blen > max {
+		max = blen
+	}
+	for i := 0; i < max; i++ {
+		var left, right string
+		if i < alen {
+			left = a[i]
+		}
+		if i < blen {
+			right = b[i]
+		}
+		if left != right {
+			if left != "" {
+				diffs = append(diffs, "- "+left)
+			}
+			if right != "" {
+				diffs = append(diffs, "+ "+right)
+			}
+		}
+	}
+	return diffs
+}
+
+// Add a function to decode hex in a line to ASCII
+func decodeHexInLine(line string) string {
+	re := regexp.MustCompile(`([0-9a-fA-F]{4,})`)
+	return re.ReplaceAllStringFunc(line, func(hexStr string) string {
+		bytes, err := hexStringToBytes(hexStr)
 		if err != nil {
-			return err
+			return hexStr
 		}
-		target := filepath.Join(dest, hdr.Name)
-		switch hdr.Typeflag {
-		case tar.TypeDir:
-			if err := os.MkdirAll(target, 0755); err != nil {
-				return err
-			}
-		case tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
-				return err
-			}
-			outFile, err := os.Create(target)
-			if err != nil {
-				return err
-			}
-			if _, err := io.Copy(outFile, tr); err != nil {
-				outFile.Close()
-				return err
-			}
-			outFile.Close()
+		ascii := string(bytes)
+		ascii = strings.ReplaceAll(ascii, "\x00", "") // Remove nulls
+		if ascii == "" {
+			return hexStr
 		}
+		return fmt.Sprintf("%s (ascii: '%s')", hexStr, ascii)
+	})
+}
+
+func hexStringToBytes(s string) ([]byte, error) {
+	if len(s)%2 != 0 {
+		s = "0" + s
 	}
-	return nil
+	return hex.DecodeString(s)
 }
