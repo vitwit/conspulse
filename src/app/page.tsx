@@ -24,6 +24,39 @@ function parseBitArray(str: string) {
   return { percent: Math.round(Number(match[3]) * 100) };
 }
 
+function timeAgo(date: Date | null) {
+  if (!date) return "";
+  const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  return `${Math.floor(diff / 3600)}h ago`;
+}
+
+// Add a CopyButton component
+function CopyButton({ value, className = "" }: { value: string, className?: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <span className={"inline-flex items-center gap-1 " + className}>
+      <button
+        type="button"
+        aria-label="Copy to clipboard"
+        title={copied ? "Copied!" : "Copy"}
+        onClick={() => {
+          navigator.clipboard.writeText(value);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1200);
+        }}
+        className="ml-1 p-1 rounded hover:bg-gray-200 focus:outline-none"
+        tabIndex={0}
+      >
+        {/* Simple copy SVG icon */}
+        <svg width="16" height="16" fill="none" viewBox="0 0 20 20"><rect x="6" y="6" width="9" height="9" rx="2" stroke="#555" strokeWidth="1.5"/><rect x="3" y="3" width="9" height="9" rx="2" stroke="#bbb" strokeWidth="1.5"/></svg>
+      </button>
+      {copied && <span className="text-xs text-green-600">Copied!</span>}
+    </span>
+  );
+}
+
 export default function Home() {
   const [consensus, setConsensus] = useState<{
     "height/round/step"?: string;
@@ -34,15 +67,27 @@ export default function Home() {
       prevotes_bit_array: string;
       precommits_bit_array: string;
     }>;
+    proposer?: { address: string };
+    start_time?: string;
   } | null>(null);
   const [validators, setValidators] = useState<{ address: string; voting_power: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingValidators, setLoadingValidators] = useState(true);
-  const [timer, setTimer] = useState(10);
+  const [timer, setTimer] = useState(1);
   const [activeMenu, setActiveMenu] = useState("consensus");
   const [favourites, setFavourites] = useState<string[]>([]);
   const [sortByPower, setSortByPower] = useState<"desc" | "asc">("desc");
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [chainId, setChainId] = useState<string | null>(null);
+  const [lastBlockTime, setLastBlockTime] = useState<Date | null>(null);
+  const [proposer, setProposer] = useState<string | null>(null);
+  const [blockStartTime, setBlockStartTime] = useState<Date | null>(null);
+  const [prevConsensus, setPrevConsensus] = useState<any>(null);
+  const [prevHeight, setPrevHeight] = useState<number | null>(null);
+  const [blockFlash, setBlockFlash] = useState(false);
+  const firstLoad = useRef(true);
+  const [progressFill, setProgressFill] = useState(0);
+  const prevProgressRef = useRef(0);
 
   // Load favourites from localStorage
   useEffect(() => {
@@ -65,23 +110,56 @@ export default function Home() {
 
   const fetchData = async () => {
     setLoading(true);
+    setLoadingValidators(true);
     try {
       const consensusRes = await fetch(`${RPC_URL}/consensus_state`);
       const consensusData = await consensusRes.json();
       setConsensus(consensusData.result.round_state);
+      setProposer(consensusData.result.round_state.proposer?.address || null);
+      setBlockStartTime(consensusData.result.round_state.start_time ? new Date(consensusData.result.round_state.start_time) : null);
       const { height } = parseHeightRoundStep(consensusData.result.round_state["height/round/step"] || "");
-      setLoadingValidators(true);
+      // Use previous consensus state if height increments by 1
+      if (prevConsensus && prevHeight && height === prevHeight + 1) {
+        // setChainId(prevConsensus.chain_id || null);
+        setLastBlockTime(prevConsensus.time ? new Date(prevConsensus.time) : null);
+      } else if (height > 1) {
+        try {
+          const blockRes = await fetch(`${RPC_URL}/block?height=${height - 1}`);
+          const blockData = await blockRes.json();
+          const header = blockData.result.block.header;
+          setChainId(header.chain_id);
+          setLastBlockTime(new Date(header.time));
+        } catch {
+          setChainId(null);
+          setLastBlockTime(null);
+        }
+      } else {
+        setChainId(null);
+        setLastBlockTime(null);
+      }
       const validatorsRes = await fetch(`${RPC_URL}/validators?height=${height}`);
       const validatorsData = await validatorsRes.json();
       setValidators(validatorsData.result.validators);
-      setLoadingValidators(false);
+      // Store previous consensus state and height for next fetch
+      setPrevConsensus({
+        chain_id: consensusData.result.round_state.chain_id || chainId,
+        time: consensusData.result.round_state.start_time || null,
+      });
+      setPrevHeight(height);
     } catch {
       setConsensus(null);
       setValidators([]);
+      setChainId(null);
+      setLastBlockTime(null);
+      setProposer(null);
+      setBlockStartTime(null);
+      setPrevConsensus(null);
+      setPrevHeight(null);
+    } finally {
+      setLoading(false);
       setLoadingValidators(false);
+      setTimer(1);
     }
-    setLoading(false);
-    setTimer(10);
   };
 
   useEffect(() => {
@@ -112,6 +190,19 @@ export default function Home() {
     precommits = parseBitArray(consensus.height_vote_set?.[0]?.precommits_bit_array || "").percent;
   }
 
+  // Move the useEffect here, after height is defined
+  useEffect(() => {
+    if (firstLoad.current) {
+      firstLoad.current = false;
+      return;
+    }
+    if (prevHeight !== null && height !== prevHeight) {
+      setBlockFlash(true);
+      setTimeout(() => setBlockFlash(false), 600);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [height]);
+
   // Voting power calculations
   const totalVotingPower = validators.reduce((sum, v) => sum + Number(v.voting_power), 0);
   let cumulative = 0;
@@ -129,6 +220,47 @@ export default function Home() {
     const bPower = Number(b.voting_power);
     return sortByPower === "desc" ? bPower - aPower : aPower - bPower;
   });
+
+  // Calculate progress percent and steps
+  const prevotesDone = prevotes > 67;
+  const precommitsDone = precommits > 67;
+  const finalized = prevHeight !== null && height > prevHeight;
+  let progressPercent = 0;
+  if (height > 0) progressPercent = 25;
+  if (prevotesDone) progressPercent = 50;
+  if (precommitsDone) progressPercent = 75;
+  if (finalized) progressPercent = 100;
+  const stepLabels = [
+    { label: "Block Started", percent: 25 },
+    { label: "Prevote", percent: 50 },
+    { label: "Precommit", percent: 75 },
+    { label: "Finalized", percent: 100 },
+  ];
+
+  // Animate progressFill on block start and step changes
+  useEffect(() => {
+    // On new block, flash to 100%, reset to 0, then animate to new progressPercent
+    if (firstLoad.current) {
+      setProgressFill(progressPercent);
+      prevProgressRef.current = progressPercent;
+      return;
+    }
+    if (prevHeight !== null && height !== prevHeight) {
+      setProgressFill(100);
+      setTimeout(() => {
+        setProgressFill(0);
+        prevProgressRef.current = 0;
+        setTimeout(() => {
+          setProgressFill(progressPercent);
+          prevProgressRef.current = progressPercent;
+        }, 80);
+      }, 100);
+    } else {
+      setProgressFill(progressPercent);
+      prevProgressRef.current = progressPercent;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [height, progressPercent]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -188,28 +320,81 @@ export default function Home() {
             </div>
 
             {/* Summary Section */}
+            <div className="max-w-5xl mx-auto mb-8">
+              <h2 className="text-lg font-bold mb-2 text-blue-800">
+                Consensus Progress for Current Block{height ? ` (${height})` : ""}
+              </h2>
+              <div className="flex flex-col items-center w-full">
+                <div className="relative w-full h-5 flex items-center">
+                  <div className="absolute left-0 top-0 w-full h-3 bg-gray-200 rounded-full" />
+                  <div
+                    className={`absolute left-0 top-0 h-3 rounded-full transition-all duration-700 ${blockFlash ? 'ring-4 ring-blue-300' : ''}`}
+                    style={{ width: `${progressFill}%`, background: 'linear-gradient(90deg, #3B82F6 0%, #8B5CF6 100%)' }}
+                  />
+                  {/* Step markers */}
+                  {stepLabels.map((step, idx) => (
+                    <div
+                      key={step.percent}
+                      className="absolute top-1/2 -translate-y-1/2"
+                      style={{ left: `calc(${step.percent}% - 8px)` }}
+                    >
+                      <div className={`w-4 h-4 rounded-full border-2 ${progressFill >= step.percent ? 'bg-blue-500 border-blue-600' : 'bg-white border-gray-300'} flex items-center justify-center transition-all duration-700`}>
+                        {progressFill >= step.percent ? (
+                          <span className="flex items-center justify-center w-full h-full">
+                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 6.5L5.5 9L9 4" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex w-full justify-between mt-2 text-xs text-gray-700">
+                  {stepLabels.map((step, idx) => (
+                    <span key={step.label} className={`w-1/4 text-center ${progressFill >= step.percent ? "font-bold text-blue-700" : "text-gray-400"}`}>{step.label}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             <div className="relative mb-8">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="flex flex-col items-center bg-blue-100 rounded-lg p-4 shadow-inner">
-                  <span className="text-gray-600">Height</span>
+                  <span className="text-gray-600" title="The latest block height observed by the node.">Latest Height</span>
                   <span className="text-xl font-bold text-blue-900">{height}</span>
                 </div>
                 <div className="flex flex-col items-center bg-green-100 rounded-lg p-4 shadow-inner">
-                  <span className="text-gray-600">Latest Round</span>
+                  <span className="text-gray-600" title="The current voting round for the latest block.">Voting Round</span>
                   <span className="text-xl font-bold text-green-900">{round}</span>
                 </div>
                 <div className="flex flex-col items-center bg-yellow-100 rounded-lg p-4 shadow-inner">
-                  <span className="text-gray-600">Pre-votes (%)</span>
-                  <span className="text-xl font-bold text-yellow-900">{prevotes}</span>
+                  <span className="text-gray-600" title="Percentage of validators that have prevoted in this round.">Pre-votes</span>
+                  <span className="text-xl font-bold text-yellow-900">{prevotes}%</span>
                 </div>
                 <div className="flex flex-col items-center bg-purple-100 rounded-lg p-4 shadow-inner">
-                  <span className="text-gray-600">Pre-commits (%)</span>
-                  <span className="text-xl font-bold text-purple-900">{precommits}</span>
+                  <span className="text-gray-600" title="Percentage of validators that have precommitted in this round.">Pre-commits</span>
+                  <span className="text-xl font-bold text-purple-900">{precommits}%</span>
+                </div>
+                <div className="flex flex-col items-center bg-gray-100 rounded-lg p-4 shadow-inner">
+                  <span className="text-gray-600" title="The unique identifier of the blockchain network.">Chain ID</span>
+                  <span className="text-base font-bold text-gray-900 flex items-center gap-1">
+                    {chainId || "—"}
+                    {chainId && <CopyButton value={chainId} />}
+                  </span>
+                </div>
+                <div className="flex flex-col items-center bg-gray-100 rounded-lg p-4 shadow-inner">
+                  <span className="text-gray-600" title="How long ago the last block was committed.">Last Block</span>
+                  <span className="text-base font-bold text-gray-900">{blockStartTime ? timeAgo(blockStartTime) : "—"}</span>
                 </div>
               </div>
-              {loading && (
-                <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded-lg text-lg font-semibold z-10">Loading...</div>
-              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                <div className="flex flex-col items-center bg-gray-100 rounded-lg p-4 shadow-inner col-span-3 md:col-span-3 w-full">
+                  <span className="text-gray-600" title="The address of the validator who proposed the current block.">Proposer</span>
+                  <span className="text-base font-bold text-gray-900 break-all flex items-center gap-1">
+                    {proposer || "—"}
+                    {proposer && <CopyButton value={proposer} />}
+                  </span>
+                </div>
+              </div>
             </div>
 
             {/* Validators Table Section */}
@@ -226,15 +411,15 @@ export default function Home() {
               <div className="relative">
                 <table className="w-full bg-white rounded-lg shadow overflow-hidden">
                   <thead className="bg-gray-100">
-                    <tr>
-                      <th className="py-2 px-4 text-left">Favourite</th>
-                      <th className="py-2 px-4 text-left">Validator Address</th>
-                      <th className="py-2 px-4 text-left">Voting Power (%)</th>
-                      <th className="py-2 px-4 text-left">Cumulative Voting Power (%)</th>
-                      <th className="py-2 px-4 text-left">Voted</th>
-                      <th className="py-2 px-4 text-left">Precommit</th>
-                      <th className="py-2 px-4 text-left">Latest Round</th>
-                    </tr>
+                      <tr>
+                        <th className="px-4 py-2 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold">Favourite</th>
+                        <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold">Validator Address</th>
+                        <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold">Voting Power (%)</th>
+                        <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold">Cumulative Voting Power (%)</th>
+                        <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold">Voted</th>
+                        <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold">Precommit</th>
+                        <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold">Latest Round</th>
+                      </tr>
                   </thead>
                   <tbody>
                     {sortedValidators.map((v, idx) => {
@@ -262,7 +447,7 @@ export default function Home() {
                         : "bg-red-50";
                       return (
                         <tr key={v.address} className={rowColor}>
-                          <td className="py-2 px-4 text-center">
+                          <td className="py-2 px-4 text-center font-sans text-sm">
                             <button
                               aria-label={favourites.includes(v.address) ? "Unfavourite" : "Favourite"}
                               onClick={() => toggleFavourite(v.address)}
@@ -271,22 +456,22 @@ export default function Home() {
                               {favourites.includes(v.address) ? "★" : "☆"}
                             </button>
                           </td>
-                          <td className="py-2 px-4 font-mono text-xs">{v.address}</td>
-                          <td className="py-2 px-4">{votingPowerPercent}</td>
-                          <td className="py-2 px-4">{cumulativePercent}</td>
-                          <td className="py-2 px-4 text-center">{voted ? "✅" : "❌"}</td>
-                          <td className="py-2 px-4 text-center">{precommitted ? "✅" : "❌"}</td>
-                          <td className="py-2 px-4 text-center">{round}</td>
+                          <td className="py-2 px-4 font-sans text-sm">
+                            <span className="flex items-center gap-1">
+                              {v.address}
+                              <CopyButton value={v.address} />
+                            </span>
+                          </td>
+                          <td className="py-2 px-4 font-sans text-sm">{votingPowerPercent}</td>
+                          <td className="py-2 px-4 font-sans text-sm">{cumulativePercent}</td>
+                          <td className="py-2 px-4 text-center font-sans text-sm">{voted ? "✅" : "❌"}</td>
+                          <td className="py-2 px-4 text-center font-sans text-sm">{precommitted ? "✅" : "❌"}</td>
+                          <td className="py-2 px-4 text-center font-sans text-sm">{round}</td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
-                {loadingValidators && (
-                  <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded-lg text-lg font-semibold z-10">
-                    Loading validators...
-                  </div>
-                )}
               </div>
             </div>
           </section>
