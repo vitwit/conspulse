@@ -1,11 +1,7 @@
 "use client";
 import React, { useEffect, useState, useRef, useCallback } from "react";
-
-const NAV_ITEMS = [
-  { label: "Consensus", key: "consensus" },
-  { label: "Netstats", key: "netstats" },
-  // Add more menu items as needed
-];
+import { usePathname } from "next/navigation";
+import Navbar from "./components/Navbar";
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
 const NETWORK_NAME = process.env.NEXT_PUBLIC_NETWORK_NAME || "";
@@ -88,6 +84,7 @@ export default function Home() {
   const firstLoad = useRef(true);
   const [progressFill, setProgressFill] = useState(0);
   const prevProgressRef = useRef(0);
+  const pathname = usePathname();
 
   // Load favourites from localStorage
   useEffect(() => {
@@ -279,25 +276,7 @@ export default function Home() {
       </div>
 
       {/* Navbar */}
-      <nav className="bg-white shadow px-4 py-3 mb-6">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/conspulse-logo.svg" alt="Conspulse Logo" className="h-9 w-9" />
-            <span className="font-bold text-xl tracking-wide text-blue-700">Conspulse</span>
-          </div>
-          <div className="flex gap-4">
-            {NAV_ITEMS.map((item) => (
-              <button
-                key={item.key}
-                className={`px-3 py-1 rounded hover:bg-blue-100 transition font-medium ${activeMenu === item.key ? "bg-blue-200 text-blue-900" : "text-gray-700"}`}
-                onClick={() => setActiveMenu(item.key)}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       <main className="flex-1">
         {activeMenu === "consensus" && (
@@ -335,7 +314,7 @@ export default function Home() {
                   {stepLabels.map((step, idx) => (
                     <div
                       key={step.percent}
-                      className="absolute top-1/2 -translate-y-1/2"
+                      className="absolute top-1/3 -translate-y-1/2"
                       style={{ left: `calc(${step.percent}% - 8px)` }}
                     >
                       <div className={`w-4 h-4 rounded-full border-2 ${progressFill >= step.percent ? 'bg-blue-500 border-blue-600' : 'bg-white border-gray-300'} flex items-center justify-center transition-all duration-700`}>
@@ -412,13 +391,26 @@ export default function Home() {
                 <table className="w-full bg-white rounded-lg shadow overflow-hidden">
                   <thead className="bg-gray-100">
                       <tr>
-                        <th className="px-4 py-2 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold">Favourite</th>
-                        <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold">Validator Address</th>
-                        <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold">Voting Power (%)</th>
-                        <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold">Cumulative Voting Power (%)</th>
-                        <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold">Voted</th>
-                        <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold">Precommit</th>
-                        <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold">Latest Round</th>
+                        <th className="px-4 py-2 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold" title="Mark as favourite for quick access">Favourite</th>
+                        <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold" title="Validator operator address">Validator Address</th>
+                        <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold cursor-pointer select-none" title="Sort by voting power (%)" onClick={() => setSortByPower((s) => (s === "desc" ? "asc" : "desc"))}>
+                          <span className="inline-flex items-center gap-1">
+                            Voting Power
+                            {sortByPower === "desc" ? (
+                              <span title="Sort by Voting Power">
+                                <svg className="inline w-4 h-4 ml-1" viewBox="0 0 16 16" fill="none"><path d="M8 11L3 6h10L8 11z" fill="#2563eb"/></svg>
+                              </span>
+                            ) : (
+                              <span title="Sort by Voting Power">
+                                <svg className="inline w-4 h-4 ml-1" viewBox="0 0 16 16" fill="none"><path d="M8 5l5 5H3l5-5z" fill="#2563eb"/></svg>
+                              </span>
+                            )}
+                          </span>
+                        </th>
+                        <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold" title="Cumulative voting power up to this validator">Cumulative Voting Power</th>
+                        <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold" title="Did this validator prevote in the current round?">Voted</th>
+                        <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold" title="Did this validator precommit in the current round?">Precommit</th>
+                        <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold" title="The latest round number for this block">Latest Round</th>
                       </tr>
                   </thead>
                   <tbody>
@@ -462,8 +454,8 @@ export default function Home() {
                               <CopyButton value={v.address} />
                             </span>
                           </td>
-                          <td className="py-2 px-4 font-sans text-sm">{votingPowerPercent}</td>
-                          <td className="py-2 px-4 font-sans text-sm">{cumulativePercent}</td>
+                          <td className="py-2 px-4 font-sans text-sm">{votingPowerPercent}%</td>
+                          <td className="py-2 px-4 font-sans text-sm">{cumulativePercent}%</td>
                           <td className="py-2 px-4 text-center font-sans text-sm">{voted ? "✅" : "❌"}</td>
                           <td className="py-2 px-4 text-center font-sans text-sm">{precommitted ? "✅" : "❌"}</td>
                           <td className="py-2 px-4 text-center font-sans text-sm">{round}</td>

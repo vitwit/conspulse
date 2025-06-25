@@ -70,6 +70,7 @@ type StoreComparison struct {
 	StoreType2  string            `json:"store_type2,omitempty"`
 	Differences []StoreDifference `json:"differences,omitempty"`
 	SampleData  *StoreSampleData  `json:"sample_data,omitempty"`
+	Extra       string            `json:"extra,omitempty"`
 }
 
 type StoreDifference struct {
@@ -156,7 +157,21 @@ func startWebServer() {
 	}
 }
 
+// Add CORS helper
+func setCORSHeaders(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+}
+
 func handleHealth(w http.ResponseWriter, r *http.Request) {
+	setCORSHeaders(w)
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	fmt.Printf("[Health] %s %s from %s\n", r.Method, r.URL.Path, r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"status":  "healthy",
@@ -166,6 +181,13 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleCompareAPI(w http.ResponseWriter, r *http.Request) {
+	setCORSHeaders(w)
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	fmt.Printf("[Compare] %s %s from %s\n", r.Method, r.URL.Path, r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method != http.MethodPost {
@@ -177,8 +199,11 @@ func handleCompareAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Log request body for POST
+	var bodyCopy bytes.Buffer
+	tee := io.TeeReader(r.Body, &bodyCopy)
 	var req CompareRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(tee).Decode(&req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(CompareResponse{
 			Success: false,
@@ -186,6 +211,7 @@ func handleCompareAPI(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	fmt.Printf("[Compare] Request body: %s\n", bodyCopy.String())
 
 	// Set default options
 	if req.Options.MaxDiffsPerStore == 0 {
@@ -343,8 +369,6 @@ func extractUploadedZip(data []byte, filename string) (*DataSource, error) {
 
 	return &DataSource{Path: extractDir, IsTemp: true}, nil
 }
-
-// ... (keeping the existing helper functions: downloadAndExtractZip, extractLocalZip, extractZipFromBytes, cleanupSource)
 
 func downloadAndExtractZip(url string) (*DataSource, error) {
 	tempDir, err := os.MkdirTemp("", "store-compare-*")
@@ -579,6 +603,29 @@ func compareStoresForAPI(dataDir1, dataDir2 string, options CompareOptions) (*Co
 			results = append(results, comparison)
 		}
 		summary.TotalStores++
+
+		if comparison.StoreType1 != "" && strings.Contains(strings.ToLower(comparison.StoreType1), "iavl") && comparison.Status == "differ" {
+			store1 := ms1.GetStoreByName(name)
+			store2 := ms2.GetStoreByName(name)
+			var tree1, tree2 *iavl.ImmutableTree
+			if t1, ok := store1.(interface{ GetImmutableTree() *iavl.ImmutableTree }); ok {
+				tree1 = t1.GetImmutableTree()
+			}
+			if t2, ok := store2.(interface{ GetImmutableTree() *iavl.ImmutableTree }); ok {
+				tree2 = t2.GetImmutableTree()
+			}
+			if tree1 != nil && tree2 != nil {
+				shape1 := getIAVLTreeShape(tree1)
+				shape2 := getIAVLTreeShape(tree2)
+				diffs := diffLines(shape1, shape2)
+				var sb strings.Builder
+				sb.WriteString("Tree Shape Diff (IAVL):\n")
+				for _, diff := range diffs {
+					sb.WriteString("  " + decodeHexInLine(diff) + "\n")
+				}
+				comparison.Extra = sb.String()
+			}
+		}
 	}
 
 	summary.IsIdentical = summary.MissingStores == 0 && summary.DifferingStores == 0
