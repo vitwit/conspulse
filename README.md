@@ -18,16 +18,17 @@ Conspulse is a modern Tendermint validator dashboard for networks like the Polyg
 1. Clone the repository:
    ```sh
    git clone https://github.com/vitwit/conspulse
-   cd conspulse/conspulse-dashboard
+   cd conspulse
    ```
 2. Install dependencies:
    ```sh
    npm install
    ```
-3. Create a `.env.local` file in `conspulse-dashboard/` with the following:
+3. Create a `.env` file with the following contents:
    ```env
    NEXT_PUBLIC_RPC_URL=https://your-tendermint-rpc-url
    NEXT_PUBLIC_NETWORK_NAME=Polygon Amoy Testnet
+   NEXT_PUBLIC_SCRIPT_API_URL= URL of the iavlviewer backend (e.g. http://localhost:8080)
    ```
    - Replace the RPC URL and network name as needed.
 
