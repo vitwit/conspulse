@@ -42,7 +42,7 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 - `NEXT_PUBLIC_NETWORK_NAME`: Name of the network (displayed in the UI)
 
 ## Contact & Support
-- Email: [hello@vitwit.com](mailto:contact@vitwit.com)
+- Email: [contact@vitwit.com](mailto:contact@vitwit.com)
 - Telegram: [@vitwit](https://t.me/+3bXmS6GE4HRjYmU1)
 - Twitter: [@vitwit](https://twitter.com/vitwit_)
 - GitHub: [vitwit](https://github.com/vitwit)
