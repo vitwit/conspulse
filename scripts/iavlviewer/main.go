@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -288,70 +289,160 @@ func detectSourceType(source string) string {
 	return "local"
 }
 
-func performComparison(req CompareRequest) CompareResponse {
-	startTime := time.Now()
-
-	response := CompareResponse{
-		Success: true,
-		Metadata: ResponseMetadata{
-			ComparisonTime: time.Now().UTC().Format(time.RFC3339),
-		},
-	}
-
-	// Prepare data sources
-	source1, err := prepareDataSourceFromRequest(req.Source1)
-	if err != nil {
-		response.Success = false
-		response.Error = fmt.Sprintf("Error preparing source1: %v", err)
-		return response
-	}
-	defer cleanupSource(source1)
-
-	source2, err := prepareDataSourceFromRequest(req.Source2)
-	if err != nil {
-		response.Success = false
-		response.Error = fmt.Sprintf("Error preparing source2: %v", err)
-		return response
-	}
-	defer cleanupSource(source2)
-
-	// Perform comparison
-	result, err := compareStoresForAPI(source1.Path, source2.Path, req.Options)
-	if err != nil {
-		response.Success = false
-		response.Error = fmt.Sprintf("Comparison failed: %v", err)
-		return response
-	}
-
-	response.Summary = result.Summary
-	response.Results = result.Results
-	response.Metadata.Source1Version = result.Metadata.Source1Version
-	response.Metadata.Source2Version = result.Metadata.Source2Version
-	response.Metadata.ProcessingTime = time.Since(startTime).String()
-
-	return response
+// Generate a unique taskID for each comparison
+func generateTaskID() string {
+	rand.Seed(time.Now().UnixNano())
+	return fmt.Sprintf("%d-%d", time.Now().UnixNano(), rand.Intn(100000))
 }
 
-func prepareDataSourceFromRequest(req DataSourceRequest) (*DataSource, error) {
+// Helper to copy a directory recursively
+func copyDir(src string, dst string) error {
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		relPath, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		targetPath := filepath.Join(dst, relPath)
+		if info.IsDir() {
+			return os.MkdirAll(targetPath, info.Mode())
+		}
+		in, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer in.Close()
+		out, err := os.Create(targetPath)
+		if err != nil {
+			return err
+		}
+		defer out.Close()
+		_, err = io.Copy(out, in)
+		if err != nil {
+			return err
+		}
+		return os.Chmod(targetPath, info.Mode())
+	})
+}
+
+// Helper to extract a zip file to a directory
+func extractZipFromFile(zipPath, destDir string) error {
+	zipData, err := os.ReadFile(zipPath)
+	if err != nil {
+		return fmt.Errorf("failed to read ZIP file: %v", err)
+	}
+	return extractZipFromBytes(zipData, destDir)
+}
+
+// Helper to download and extract a zip from URL to a directory
+func downloadAndExtractZipToDir(url, destDir string) error {
+	client := &http.Client{Timeout: 30 * time.Minute}
+	resp, err := client.Get(url)
+	if err != nil {
+		return fmt.Errorf("failed to download ZIP: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to download ZIP: HTTP %d", resp.StatusCode)
+	}
+	zipData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read ZIP data: %v", err)
+	}
+	return extractZipFromBytes(zipData, destDir)
+}
+
+// Add a helper to find the real DB directory if there's a single subdirectory
+func findDBDir(root string) string {
+	files, err := os.ReadDir(root)
+	if err != nil {
+		return root
+	}
+	// If only one subdir, and it's a directory, descend into it
+	if len(files) == 1 && files[0].IsDir() {
+		return filepath.Join(root, files[0].Name())
+	}
+	// If multiple subdirs, pick the one containing application.db
+	for _, f := range files {
+		if f.IsDir() {
+			subdir := filepath.Join(root, f.Name())
+			appdb := filepath.Join(subdir, "application.db")
+			info, err := os.Stat(appdb)
+			if err == nil && info.IsDir() {
+				return subdir
+			}
+		}
+	}
+	return root
+}
+
+// Refactor prepareDataSourceFromRequest to use taskID and dirName
+func prepareDataSourceFromRequest(req DataSourceRequest, taskID, dirName string) (*DataSource, error) {
+	targetDir := filepath.Join("inputs", taskID, dirName)
+	os.MkdirAll(targetDir, 0755)
+
 	switch req.Type {
 	case "local":
-		if _, err := os.Stat(req.Path); err != nil {
-			return nil, fmt.Errorf("local path does not exist: %s", req.Path)
+		err := copyDir(req.Path, targetDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to copy local dir: %v", err)
 		}
-		return &DataSource{Path: req.Path, IsTemp: false}, nil
+		finalDir := findDBDir(targetDir)
+		fmt.Printf("[INFO] Final data directory used for comparison: %s\n", finalDir)
+		return &DataSource{Path: finalDir, IsTemp: false}, nil
 
 	case "zip_file":
-		return extractLocalZip(req.Path)
+		err := extractZipFromFile(req.Path, targetDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract zip file: %v", err)
+		}
+		finalDir := findDBDir(targetDir)
+		fmt.Printf("[INFO] Final data directory used for comparison: %s\n", finalDir)
+		return &DataSource{Path: finalDir, IsTemp: false}, nil
 
 	case "zip_url":
-		return downloadAndExtractZip(req.URL)
+		err := downloadAndExtractZipToDir(req.URL, targetDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to download/extract zip: %v", err)
+		}
+		finalDir := findDBDir(targetDir)
+		fmt.Printf("[INFO] Final data directory used for comparison: %s\n", finalDir)
+		return &DataSource{Path: finalDir, IsTemp: false}, nil
 
 	case "upload":
-		return extractUploadedZip(req.Data, req.Name)
+		err := extractZipFromBytes(req.Data, targetDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract uploaded zip: %v", err)
+		}
+		finalDir := findDBDir(targetDir)
+		fmt.Printf("[INFO] Final data directory used for comparison: %s\n", finalDir)
+		return &DataSource{Path: finalDir, IsTemp: false}, nil
 
 	default:
 		return nil, fmt.Errorf("unsupported source type: %s", req.Type)
 	}
+}
+
+// Add a helper to recursively log directory contents
+func logDirContents(root string) {
+	fmt.Printf("[DEBUG] Listing contents of %s\n", root)
+	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			fmt.Printf("  [ERROR] %s: %v\n", path, err)
+			return nil
+		}
+		rel, _ := filepath.Rel(root, path)
+		if rel == "." {
+			fmt.Printf("  [DIR]  %s\n", path)
+		} else if info.IsDir() {
+			fmt.Printf("  [DIR]  %s\n", rel)
+		} else {
+			fmt.Printf("  [FILE] %s\n", rel)
+		}
+		return nil
+	})
 }
 
 func extractUploadedZip(data []byte, filename string) (*DataSource, error) {
@@ -366,6 +457,9 @@ func extractUploadedZip(data []byte, filename string) (*DataSource, error) {
 		os.RemoveAll(tempDir)
 		return nil, fmt.Errorf("failed to extract uploaded ZIP: %v", err)
 	}
+
+	logDirContents(extractDir)
+	fmt.Printf("[INFO] Using extracted data directory for comparison: %s\n", extractDir)
 
 	return &DataSource{Path: extractDir, IsTemp: true}, nil
 }
@@ -402,6 +496,9 @@ func downloadAndExtractZip(url string) (*DataSource, error) {
 		return nil, fmt.Errorf("failed to extract ZIP: %v", err)
 	}
 
+	logDirContents(extractDir)
+	fmt.Printf("[INFO] Using extracted data directory for comparison: %s\n", extractDir)
+
 	return &DataSource{Path: extractDir, IsTemp: true}, nil
 }
 
@@ -423,6 +520,9 @@ func extractLocalZip(zipPath string) (*DataSource, error) {
 		os.RemoveAll(tempDir)
 		return nil, fmt.Errorf("failed to extract ZIP: %v", err)
 	}
+
+	logDirContents(extractDir)
+	fmt.Printf("[INFO] Using extracted data directory for comparison: %s\n", extractDir)
 
 	return &DataSource{Path: extractDir, IsTemp: true}, nil
 }
@@ -478,7 +578,7 @@ func extractZipFromBytes(zipData []byte, destDir string) error {
 
 func cleanupSource(source *DataSource) {
 	if source.IsTemp {
-		os.RemoveAll(source.Path)
+		// os.RemoveAll(source.Path) // Disabled for manual review
 	}
 }
 
@@ -597,6 +697,40 @@ func compareStoresForAPI(dataDir1, dataDir2 string, options CompareOptions) (*Co
 				comparison.StoreType2 = getStoreType(ms2, name)
 			}
 			summary.DifferingStores++
+
+			// Add latest version or error in Extra, with a helpful note
+			var extraInfo []string
+			ver1 := ms1.LatestVersion()
+			ver2 := ms2.LatestVersion()
+			extraInfo = append(extraInfo, fmt.Sprintf("source1 latest version: %d", ver1))
+			extraInfo = append(extraInfo, fmt.Sprintf("source2 latest version: %d", ver2))
+			missing1 := false
+			missing2 := false
+			if store1 := ms1.GetStoreByName(name); store1 != nil {
+				if v, ok := store1.(interface{ LatestVersion() int64 }); ok {
+					extraInfo = append(extraInfo, fmt.Sprintf("source1 store latest version: %d", v.LatestVersion()))
+				}
+			} else {
+				extraInfo = append(extraInfo, "source1 store not found")
+				missing1 = true
+			}
+			if store2 := ms2.GetStoreByName(name); store2 != nil {
+				if v, ok := store2.(interface{ LatestVersion() int64 }); ok {
+					extraInfo = append(extraInfo, fmt.Sprintf("source2 store latest version: %d", v.LatestVersion()))
+				}
+			} else {
+				extraInfo = append(extraInfo, "source2 store not found")
+				missing2 = true
+			}
+			// Add a note if either store is missing
+			if missing1 && missing2 {
+				extraInfo = append(extraInfo, fmt.Sprintf("note: Store '%s' is missing in both sources at the latest version. This may indicate the store was deleted, renamed, or never created in these snapshots. This could happen due to a misconfigured genesis file or an upgrade/migration that was not applied consistently to both sources.", name))
+			} else if missing1 {
+				extraInfo = append(extraInfo, fmt.Sprintf("note: Store '%s' is missing in source1 but present in source2. This may indicate a migration, deletion, or a difference in app versions.", name))
+			} else if missing2 {
+				extraInfo = append(extraInfo, fmt.Sprintf("note: Store '%s' is missing in source2 but present in source1. This may indicate a migration, deletion, or a difference in app versions.", name))
+			}
+			comparison.Extra = strings.Join(extraInfo, "; ")
 		}
 
 		if options.ShowMatchingStores || comparison.Status != "match" {
@@ -1053,4 +1187,56 @@ func hexStringToBytes(s string) ([]byte, error) {
 		s = "0" + s
 	}
 	return hex.DecodeString(s)
+}
+
+func performComparison(req CompareRequest) CompareResponse {
+	startTime := time.Now()
+
+	response := CompareResponse{
+		Success: true,
+		Metadata: ResponseMetadata{
+			ComparisonTime: time.Now().UTC().Format(time.RFC3339),
+		},
+	}
+
+	// Generate a unique taskID for this comparison
+	taskID := generateTaskID()
+	inputDir := filepath.Join("inputs", taskID)
+
+	// Prepare data sources
+	source1, err := prepareDataSourceFromRequest(req.Source1, taskID, "dir1")
+	if err != nil {
+		response.Success = false
+		response.Error = fmt.Sprintf("Error preparing source1: %v", err)
+		os.RemoveAll(inputDir)
+		return response
+	}
+
+	source2, err := prepareDataSourceFromRequest(req.Source2, taskID, "dir2")
+	if err != nil {
+		response.Success = false
+		response.Error = fmt.Sprintf("Error preparing source2: %v", err)
+		os.RemoveAll(inputDir)
+		return response
+	}
+
+	// Perform comparison
+	result, err := compareStoresForAPI(source1.Path, source2.Path, req.Options)
+	if err != nil {
+		response.Success = false
+		response.Error = fmt.Sprintf("Comparison failed: %v", err)
+		os.RemoveAll(inputDir)
+		return response
+	}
+
+	response.Summary = result.Summary
+	response.Results = result.Results
+	response.Metadata.Source1Version = result.Metadata.Source1Version
+	response.Metadata.Source2Version = result.Metadata.Source2Version
+	response.Metadata.ProcessingTime = time.Since(startTime).String()
+
+	// Clean up after processing
+	os.RemoveAll(inputDir)
+
+	return response
 }
