@@ -86,6 +86,9 @@ export default function Home() {
   const [progressFill, setProgressFill] = useState(0);
   const prevProgressRef = useRef(0);
   const pathname = usePathname();
+  const [dumpConsensus, setDumpConsensus] = useState<any>(null);
+  const [dumpLoading, setDumpLoading] = useState(false);
+  const [dumpError, setDumpError] = useState<string | null>(null);
 
   // Load favourites from localStorage
   useEffect(() => {
@@ -172,7 +175,7 @@ export default function Home() {
       fetchData();
       return;
     }
-    timerRef.current = setTimeout(() => setTimer((t) => t - 1), 1000);
+    timerRef.current = setTimeout(() => setTimer((t) => t - 1), 2000);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
@@ -196,7 +199,7 @@ export default function Home() {
     }
     if (prevHeight !== null && height !== prevHeight) {
       setBlockFlash(true);
-      setTimeout(() => setBlockFlash(false), 600);
+      setTimeout(() => setBlockFlash(false), 200);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [height]);
@@ -259,6 +262,29 @@ export default function Home() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [height, progressPercent]);
+
+  const fetchDumpConsensus = useCallback(async () => {
+    setDumpLoading(true);
+    setDumpError(null);
+    try {
+      const res = await fetch(`${RPC_URL}/dump_consensus_state`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setDumpConsensus(data);
+    } catch (err: any) {
+      setDumpError(err.message || "Unknown error");
+      setDumpConsensus(null);
+    } finally {
+      setDumpLoading(false);
+    }
+  }, []);
+
+  // Auto-refresh every second, like consensus state
+  useEffect(() => {
+    fetchDumpConsensus();
+    const interval = setInterval(fetchDumpConsensus, 10000);
+    return () => clearInterval(interval);
+  }, [fetchDumpConsensus]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -365,6 +391,10 @@ export default function Home() {
                   <span className="text-gray-600" title="How long ago the last block was committed.">Last Block</span>
                   <span className="text-base font-bold text-gray-900">{blockStartTime ? timeAgo(blockStartTime) : "—"}</span>
                 </div>
+                <div className="flex flex-col items-center bg-pink-100 rounded-lg p-4 shadow-inner">
+                  <span className="text-gray-600" title="Number of peers connected to this node.">Peers</span>
+                  <span className="text-xl font-bold text-pink-900">{Array.isArray(dumpConsensus?.result?.peers) ? dumpConsensus.result.peers.length : '—'}</span>
+                </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
                 <div className="flex flex-col items-center bg-gray-100 rounded-lg p-4 shadow-inner col-span-3 md:col-span-3 w-full">
@@ -376,6 +406,38 @@ export default function Home() {
                 </div>
               </div>
             </div>
+
+            {/* Proposer Info Section (from dumpConsensus) */}
+            {(() => {
+              const proposerAddr = dumpConsensus?.result?.round_state?.proposer?.address;
+              const proposerObj = dumpConsensus?.result?.round_state?.validators?.validators?.find?.((v: any) => v.address === proposerAddr);
+              const blockProposerAddr = dumpConsensus?.result?.round_state?.proposal_block?.header?.proposer_address;
+              return proposerAddr ? (
+                <div className="bg-blue-50 rounded-lg p-4 shadow-inner mb-8">
+                  <h3 className="text-lg font-semibold mb-2 text-blue-800">Current Proposer Info</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500">Proposer Address</span>
+                      <div className="font-mono flex items-center gap-1">{proposerAddr}<CopyButton value={proposerAddr} /></div>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Voting Power</span>
+                      <div className="font-mono">{proposerObj?.voting_power || '—'}</div>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Proposer Priority</span>
+                      <div className="font-mono">{proposerObj?.proposer_priority || '—'}</div>
+                    </div>
+                    {blockProposerAddr && (
+                      <div>
+                        <span className="text-gray-500">Block Proposer Address</span>
+                        <div className="font-mono flex items-center gap-1">{blockProposerAddr}<CopyButton value={blockProposerAddr} /></div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null;
+            })()}
 
             {/* Validators Table Section */}
             <div className="relative">
@@ -467,10 +529,38 @@ export default function Home() {
                 </table>
               </div>
             </div>
+
+            {/* Votes by Round Section (from dumpConsensus) - moved to bottom */}
+            {dumpLoading ? (
+              <div>Loading votes by round...</div>
+            ) : dumpError ? (
+              <div className="text-red-400">Error loading votes: {dumpError}</div>
+            ) : Array.isArray(dumpConsensus?.result?.round_state?.votes) && dumpConsensus.result.round_state.votes.length > 0 && (
+              <div className="bg-gray-50 rounded-lg p-4 shadow-inner mt-8">
+                <h3 className="text-lg font-semibold mb-2 text-blue-800">Votes by Round</h3>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="px-2 py-1 text-left">Round</th>
+                        <th className="px-2 py-1 text-left">Prevotes Bit Array</th>
+                        <th className="px-2 py-1 text-left">Precommits Bit Array</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dumpConsensus.result.round_state.votes.map((vote: any, idx: number) => (
+                        <tr key={idx} className="border-b last:border-b-0">
+                          <td className="px-2 py-1 font-mono">{vote.round ?? idx}</td>
+                          <td className="px-2 py-1 font-mono break-all">{vote.prevotes_bit_array || '—'}</td>
+                          <td className="px-2 py-1 font-mono break-all">{vote.precommits_bit_array || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </section>
-        )}
-        {activeMenu === "netstats" && (
-          <div className="p-8 text-center text-gray-500 text-lg">Netstats coming soon...</div>
         )}
       </main>
 
