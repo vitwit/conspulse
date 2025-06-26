@@ -1,5 +1,7 @@
 import React from "react";
 
+const NETWORK_NAME = process.env.NEXT_PUBLIC_NETWORK_NAME || "the network";
+
 export default function Footer() {
   return (
     <footer className="w-full bg-gradient-to-r from-gray-50 to-blue-50 border-t mt-8 px-4 pt-8 pb-4 flex flex-col gap-4 text-gray-700 text-sm shadow-inner">
@@ -12,7 +14,7 @@ export default function Footer() {
           </div>
           <h3 className="font-semibold text-base text-blue-800 mb-1">About Conspulse</h3>
           <p className="text-gray-700 leading-relaxed">
-            <span className="font-bold">Conspulse</span> is a Tendermint validator dashboard for <span className="font-semibold text-blue-700">the network</span>. It provides real-time consensus state, validator stats, and network insights, helping users and operators monitor validator performance and network health. Support us by delegating to the Vitwit validator!
+            <span className="font-bold">Conspulse</span> is a Tendermint validator dashboard for <span className="font-semibold text-blue-700">{NETWORK_NAME}</span>. It provides real-time consensus state, validator stats, and network insights, helping users and operators monitor validator performance and network health. Support us by delegating to the Vitwit validator!
           </p>
         </div>
         {/* Socials & Powered by Right */}
