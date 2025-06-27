@@ -79,6 +79,17 @@ export default function DebugConsensusPage() {
         <section className="p-4 sm:p-8 max-w-5xl mx-auto bg-white rounded-xl shadow-lg mb-8">
           <h1 className="text-2xl font-bold mb-2 text-blue-800">Debug Consensus / AppHash Mismatch</h1>
           <p className="mb-6 text-gray-700 whitespace-pre-line">{description}</p>
+          {/* Fill Test Data Button */}
+          <button
+            type="button"
+            className="mb-4 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded font-semibold transition"
+            onClick={() => {
+              setSource1("https://raw.githubusercontent.com/vitwit/conspulse/refs/heads/temp/heimdallv2backup.zip");
+              setSource2("https://raw.githubusercontent.com/vitwit/conspulse/refs/heads/temp/heimdallv2.backup.zip");
+            }}
+          >
+            Fill Test Data
+          </button>
           <form onSubmit={handleSubmit} className="rounded-lg p-0 mb-8 flex flex-col gap-4">
             <div>
               <label className="block font-semibold mb-1">Source 1</label>
@@ -136,7 +147,7 @@ export default function DebugConsensusPage() {
               className="bg-blue-600 text-white px-6 py-2 rounded font-semibold hover:bg-blue-700 transition w-fit"
               disabled={loading}
             >
-              {loading ? "Comparing..." : "Compare"}
+              {loading ? "Debugging..." : "Debug state"}
             </button>
           </form>
           {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>}
