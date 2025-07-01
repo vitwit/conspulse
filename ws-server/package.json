@@ -1,0 +1,28 @@
+{
+  "name": "ws-server",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "dev": "ts-node src/index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/d3": "^7.4.3",
+    "@types/lodash": "^4.17.19",
+    "@types/node": "^24.0.4",
+    "@types/pino": "^7.0.4",
+    "@types/ws": "^8.18.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3",
+    "ws": "^8.18.2"
+  },
+  "dependencies": {
+    "d3": "^7.9.0",
+    "lodash": "^4.17.21",
+    "pino": "^9.7.0",
+    "pino-pretty": "^13.0.0"
+  }
+}
