@@ -28,8 +28,14 @@ CREATE TABLE IF NOT EXISTS node_stats
     peers                 Array(String),
     network               String,
     os                    String,
-    goVersion             String
+    goVersion             String,
+    latitude              Float64,
+    longitude             Float64,
+    country               String,
+    Transactions          UInt64,
+    updatedAt             UInt64,
+    latency               UInt64,
 )
-ENGINE = ReplacingMergeTree
+ENGINE = ReplacingMergeTree(updatedAt)
 PARTITION BY toYYYYMM(blockTime)
 ORDER BY (address, height)

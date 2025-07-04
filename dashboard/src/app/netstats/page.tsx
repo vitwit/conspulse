@@ -4,6 +4,25 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { getNodes, NodeStats } from "../lib/api";
 
+import dynamic from 'next/dynamic';
+
+const NodeMap = dynamic(() => import('../components/NodeMap'), {
+  ssr: false,
+});
+
+function formatLatency(ms: number): string {
+  if (ms < 1000) {
+    return `${ms.toLocaleString()}ms`;
+  } else if (ms < 60000) {
+    return `${(ms / 1000).toFixed(2)}s`;
+  } else {
+    const minutes = Math.floor(ms / 60000);
+    const seconds = ((ms % 60000) / 1000).toFixed(1);
+    return `${minutes}m ${seconds}s`;
+  }
+}
+
+
 function ErrorAlert({
   errors,
 }: {
@@ -217,6 +236,19 @@ export default function NetstatsPage() {
     };
   }
 
+  const nodesLocation = nodes.map((node: NodeStats) => {
+    return {
+      latitude: node.latitude,
+      longitude: node.longitude,
+      nodeName: node.country,
+      radius: 5,
+      fillKey: 'success'
+      
+    }
+  })
+
+
+
   const lastBlockVotesInfo = parseBitArray(lastCommitBitArray);
 
   return (
@@ -254,6 +286,7 @@ export default function NetstatsPage() {
           /> */}
 
           {/* Summary Section */}
+                  <NodeMap data={nodesLocation} />
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <div className="flex flex-col items-center bg-blue-100 rounded-lg p-4 shadow-inner">
               <span className="text-gray-600">Latest Height</span>
@@ -268,7 +301,7 @@ export default function NetstatsPage() {
               <span className="text-xl font-bold text-purple-900">{step}</span>
             </div>
             <div className="flex flex-col items-center bg-pink-100 rounded-lg p-4 shadow-inner">
-              <span className="text-gray-600">Peers</span>
+              <span className="text-gray-600">Total Nodes</span>
               <span className="text-xl font-bold text-pink-900">{nPeers}</span>
             </div>
             <div className="flex flex-col items-center bg-gray-100 rounded-lg p-4 shadow-inner">
@@ -281,7 +314,7 @@ export default function NetstatsPage() {
               <span className="text-xs text-gray-700">{lastBlockVotesInfo.voted}/{lastBlockVotesInfo.total}</span>
             </div>
             <div className="flex flex-col items-center bg-gray-200 rounded-lg p-4 shadow-inner">
-              <span className="text-gray-600">Validators</span>
+              <span className="text-gray-600">Active Validators</span>
               <span className="text-xl font-bold text-gray-900">{validators.length}</span>
             </div>
             <div className="flex flex-col items-center bg-gray-100 rounded-lg p-4 shadow-inner col-span-2">
@@ -328,6 +361,7 @@ export default function NetstatsPage() {
                     <th className="px-4 py-2 text-left">Node ID</th>
                     <th className="px-4 py-2 text-left">Earliest Height</th>
                     <th className="px-4 py-2 text-left">Latest Height</th>
+                    <th className="px-4 py-2 text-left">Hash</th>
                     <th className="px-4 py-2 text-left">Block Time</th>
                     <th className="px-4 py-2 text-left">Syncing</th>
                     <th className="px-4 py-2 text-left">Network</th>
@@ -336,6 +370,7 @@ export default function NetstatsPage() {
                     <th className="px-4 py-2 text-left">Version</th>
                     <th className="px-4 py-2 text-left">OS</th>
                     <th className="px-4 py-2 text-left">Go Version</th>
+                    <th className="px-4 py-2 text-left">Latency</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -349,6 +384,7 @@ export default function NetstatsPage() {
                       <td className="px-4 py-2 font-mono break-all">{node.nodeID || "—"}</td>
                       <td className="px-4 py-2 font-mono">{node.earliestBlockHeight || "—"}</td>
                       <td className="px-4 py-2 font-mono">{node.latestBlockHeight || "—"}</td>
+                      <td className="px-4 py-2 font-mono">{node.latestAppHash || "—"}</td>
                       <td className="px-4 py-2 font-mono">{node.blockTime ?? "—"}</td>
                       <td className="px-4 py-2 font-mono">{node?.isSyncing ? "Yes" : "No"}</td>
                       <td className="px-4 py-2 font-mono">{node.network || "—"}</td>
@@ -357,6 +393,7 @@ export default function NetstatsPage() {
                       <td className="px-4 py-2 font-mono">{node.version}</td>
                       <td className="px-4 py-2 font-mono">{node.os}</td>
                       <td className="px-4 py-2 font-mono">{node.goVersion}</td>
+                      <td className="px-4 py-2 font-mono">{formatLatency(node.latency)}</td>
 
                     </tr>
                   ))}

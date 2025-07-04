@@ -22,6 +22,11 @@ export const StatsSchema = z.object({
     network: z.string(),
     os: z.string(),
     goVersion: z.string(),
+    country: z.string(),
+    latitude: z.number(),
+    longitude: z.number(),
+    transactions: z.number(),
+    latency: z.number(),
 
 });
 
@@ -56,7 +61,11 @@ export const submitStats = async (
             })
         }
 
-        await db.storeNodeStats(stats);
+        const unixTimestamp = Math.floor(Date.now() / 1000);
+        await db.storeNodeStats({
+            ...stats,
+            updatedAt: unixTimestamp
+        });
 
         return res.status(200).json({
             message: "stats saved successfully"

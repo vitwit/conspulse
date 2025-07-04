@@ -15,6 +15,11 @@ export interface NodeStats {
     network: string;
     os: string;
     goVersion: string;
+    latitude: number;
+    longitude: number;
+    transactions: number;
+    country: string;
+    latency: number;
 }
 
 const API = process.env.NEXT_PUBLIC_METRICS_BACKEND_URL;

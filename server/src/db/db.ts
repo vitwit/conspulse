@@ -32,6 +32,12 @@ export interface NodeStats {
     network: string;
     os: string;
     goVersion: string;
+    latitude: number;
+    longitude: number;
+    country: string;
+    transactions: number;
+    updatedAt: number;
+    latency: number;
 }
 
 type CutoffResult = {
@@ -104,6 +110,7 @@ export class Database {
                 format: 'JSONEachRow',
             });
         } catch (err) {
+            console.log(err);
             throw err;
         }
 
