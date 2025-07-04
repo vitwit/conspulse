@@ -34,6 +34,12 @@ export interface NodeStats {
     goVersion: string;
 }
 
+type CutoffResult = {
+    address: string;
+    minHeightToKeep: number;
+};
+
+
 
 export class Database {
     private client: ReturnType<typeof createClient>;
@@ -91,13 +97,16 @@ export class Database {
     }
 
     async storeNodeStats(stats: NodeStats): Promise<void> {
-        await this.client.insert({
-            table: 'node_stats',
-            values: [stats],
-            format: 'JSONEachRow',
-        });
+        try {
+            await this.client.insert({
+                table: 'node_stats',
+                values: [stats],
+                format: 'JSONEachRow',
+            });
+        } catch (err) {
+            throw err;
+        }
 
-        logger.info(`stats saved for node: ${stats.address}`);
     }
 
     async updateNode(node: NodeInfo): Promise<void> {
@@ -187,4 +196,43 @@ ORDER BY blockTime DESC;
 
     }
 
+    async cleanOldRecords(): Promise<void> {
+        const cutoffQuery = `
+    WITH ranked AS (
+        SELECT
+            address,
+            height,
+            row_number() OVER (PARTITION BY address ORDER BY height DESC) AS rn
+        FROM node_stats
+    )
+    SELECT
+        address,
+        MIN(height) AS minHeightToKeep
+    FROM ranked
+    WHERE rn <= 5000
+    GROUP BY address
+  `;
+
+        try {
+            const result: CutoffResult[] = await this.client
+                .query({ query: cutoffQuery, format: 'JSONEachRow' })
+                .then((res) => res.json());
+
+            for (const row of result) {
+                const { address, minHeightToKeep } = row;
+
+                const deleteQuery = `
+        ALTER TABLE node_stats
+        DELETE WHERE address = '${address}' AND height < ${minHeightToKeep}
+      `;
+
+                logger.info(`Cleaning ${address} below height ${minHeightToKeep}`);
+                await this.client.command({ query: deleteQuery });
+            }
+
+            logger.info('Cleanup completed.');
+        } catch (error) {
+            logger.error('Error during cleanup:', error);
+        }
+    }
 }

@@ -6,6 +6,7 @@ import Footer from "../components/Footer";
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
 const DUMP_CONSENSUS_URL = `${RPC_URL}/dump_consensus_state`;
 const NET_INFO_URL = `${RPC_URL}/net_info`;
+const METRICS_SOCKET_URL = process.env.NEXT_PUBLIC_METRICS_WEBSOCKET;
 
 function CopyButton({ value, className = "" }: { value: string, className?: string }) {
   const [copied, setCopied] = useState(false);
@@ -23,7 +24,7 @@ function CopyButton({ value, className = "" }: { value: string, className?: stri
         className="ml-1 p-1 rounded hover:bg-gray-200 focus:outline-none"
         tabIndex={0}
       >
-        <svg width="16" height="16" fill="none" viewBox="0 0 20 20"><rect x="6" y="6" width="9" height="9" rx="2" stroke="#555" strokeWidth="1.5"/><rect x="3" y="3" width="9" height="9" rx="2" stroke="#bbb" strokeWidth="1.5"/></svg>
+        <svg width="16" height="16" fill="none" viewBox="0 0 20 20"><rect x="6" y="6" width="9" height="9" rx="2" stroke="#555" strokeWidth="1.5" /><rect x="3" y="3" width="9" height="9" rx="2" stroke="#bbb" strokeWidth="1.5" /></svg>
       </button>
       {copied && <span className="text-xs text-green-600">Copied!</span>}
     </span>
@@ -78,11 +79,48 @@ export default function NetstatsPage() {
   const [errorDump, setErrorDump] = useState<string | null>(null);
   const [errorNet, setErrorNet] = useState<string | null>(null);
 
+
   // For live-updating time.ago
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
+  }, []);
+
+
+  const [blockTime, setBlockTime] = useState<number>(6000);
+  const [nodeMetaByMoniker, setNodeMetaByMoniker] = useState<Record<string, any>>({});
+  useEffect(() => {
+
+    if (!METRICS_SOCKET_URL) {
+      alert("metrics websocket url is not set");
+      return;
+    }
+    const ws = new WebSocket(METRICS_SOCKET_URL!!);
+
+    ws.onopen = () => {
+      console.log('[WS] Connected to central server');
+    };
+
+    ws.onmessage = (event) => {
+      const data: any = JSON.parse(event.data);
+      if (data.type === 'updated') {
+        setBlockTime(data.metrics.averageBlockTime || 6000);
+
+        const metaMap: Record<string, any> = {};
+        for (const nodeKey in data.nodes) {
+          const node = data.nodes[nodeKey];
+          const moniker = node?.meta?.id || nodeKey;
+          metaMap[moniker] = node.meta;
+        }
+        setNodeMetaByMoniker(metaMap);
+      }
+    };
+
+    ws.onclose = () => console.log('[WS] Disconnected');
+    ws.onerror = (err) => console.error('[WS] Error:', err);
+
+    return () => ws.close();
   }, []);
 
   // Fetch dump_consensus_state every 10s
@@ -169,6 +207,10 @@ export default function NetstatsPage() {
       const date = new Date(peerStartTime);
       if (!isNaN(date.getTime())) lastSeen = timeAgo(date, now);
     }
+
+    const moniker = netPeer?.node_info?.moniker;
+    const meta = moniker ? nodeMetaByMoniker[moniker] : null;
+
     return {
       node_address: peer.node_address,
       height: peer.peer_state?.round_state?.height,
@@ -177,8 +219,10 @@ export default function NetstatsPage() {
       moniker: netPeer?.node_info?.moniker,
       id: netPeer?.node_info?.id,
       is_outbound: netPeer?.is_outbound,
-      version: netPeer?.node_info?.version,
       network: netPeer?.node_info?.network,
+      version: meta?.version || netPeer?.node_info?.version || "—",
+      goVersion: meta?.goVersion || "—",
+      os: meta?.os || "—",
       lastSeen,
       rowColor,
     };
@@ -247,6 +291,10 @@ export default function NetstatsPage() {
               <span className="text-gray-600">Last Block Time</span>
               <span className="text-base font-bold text-gray-900">{lastBlockTime ? timeAgo(lastBlockTime, now) : "—"}</span>
             </div>
+            <div className="flex flex-col items-center bg-gray-100 rounded-lg p-4 shadow-inner">
+              <span className="text-gray-600">Average Block Time</span>
+              <span className="text-base font-bold text-gray-900">{(blockTime / 1000).toFixed(2)} s</span>
+            </div>
             <div className="flex flex-col items-center bg-orange-100 rounded-lg p-4 shadow-inner">
               <span className="text-gray-600">Last Block Votes %</span>
               <span className="text-xl font-bold text-orange-900">{lastBlockVotesInfo.percent}%</span>
@@ -304,6 +352,8 @@ export default function NetstatsPage() {
                     <th className="px-4 py-2 text-left">Outbound?</th>
                     <th className="px-4 py-2 text-left">Version</th>
                     <th className="px-4 py-2 text-left">Network</th>
+                    <th className="px-4 py-2 text-left">Go Version</th>
+                    <th className="px-4 py-2 text-left">OS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -321,6 +371,9 @@ export default function NetstatsPage() {
                       <td className="px-4 py-2 font-mono">{peer.is_outbound === undefined ? "—" : peer.is_outbound ? "Yes" : "No"}</td>
                       <td className="px-4 py-2 font-mono">{peer.version || "—"}</td>
                       <td className="px-4 py-2 font-mono">{peer.network || "—"}</td>
+                      <td className="px-4 py-2 font-mono">{peer.goVersion}</td>
+                      <td className="px-4 py-2 font-mono">{peer.os}</td>
+
                     </tr>
                   ))}
                 </tbody>
