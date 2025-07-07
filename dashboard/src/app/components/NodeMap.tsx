@@ -18,18 +18,16 @@ interface NodeMapProps {
 
 const NodeMap: React.FC<NodeMapProps> = ({ data }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<any>(null);
 
   useEffect(() => {
     if (!mapContainer.current) return;
 
-    // Clear previous map
     mapContainer.current.innerHTML = '';
 
     const map = new Datamap({
       element: mapContainer.current,
       scope: 'world',
-      width: 800,
-      height: 400,
       fills: {
         defaultFill: '#2b2b2b',
         success: '#7BCC3A',
@@ -40,24 +38,50 @@ const NodeMap: React.FC<NodeMapProps> = ({ data }) => {
       },
       geographyConfig: {
         borderWidth: 0.5,
-        borderColor: '#333',
+        borderColor: '#888',
         highlightOnHover: false,
-        popupOnHover: false
+        popupOnHover: false,
       },
       bubblesConfig: {
         borderWidth: 0,
         popupOnHover: true,
-        highlightOnHover: false,
-        popupTemplate: function (geo: any, data: any) {
-          return `<div class="hoverinfo"><strong>${data.nodeName}</strong></div>`;
-        }
+        highlightOnHover: true,
+        popupTemplate: function (_: any, data: any) {
+          return `
+    <div style="
+      background: black;
+      color: white;
+      padding: 4px 8px;
+      font-size: 12px;
+    ">
+      ${data.nodeName || 'Unnamed Node'}
+    </div>`;
+        },
       }
     });
 
     map.bubbles(data);
+    mapRef.current = map;
+
+    // Resize listener
+    const handleResize = () => {
+      if (mapRef.current) {
+        mapRef.current.resize();
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [data]);
 
-  return <div ref={mapContainer} />;
+  return (
+    <div className="w-full aspect-[11/5] relative">
+      <div
+        ref={mapContainer}
+        className="w-full h-full"
+      />
+    </div>
+  );
 };
 
 export default NodeMap;

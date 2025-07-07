@@ -74,8 +74,8 @@ export default function DebugConsensusPage() {
         🚀
       </div>
       {/* Navbar */}
-      <Navbar />
-      <main className="flex-1">
+      <Navbar shrink={true}/>
+      <main className="flex-1 mt-4">
         <section className="p-4 sm:p-8 max-w-5xl mx-auto bg-white rounded-xl shadow-lg mb-8">
           <h1 className="text-2xl font-bold mb-2 text-blue-800">Debug Consensus / AppHash Mismatch</h1>
           <p className="mb-6 text-gray-700 whitespace-pre-line">{description}</p>

@@ -334,9 +334,9 @@ export default function Home() {
       </div>
 
       {/* Navbar */}
-      <Navbar />
+      <Navbar shrink={true} />
 
-      <main className="flex-1">
+      <main className="flex-1 mt-4">
         {activeMenu === "consensus" && (
           <section className="p-4 sm:p-8 max-w-5xl mx-auto bg-white rounded-xl shadow-lg">
             {/* Header Section */}

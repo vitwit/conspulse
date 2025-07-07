@@ -9,11 +9,11 @@ export const NAV_ITEMS = [
   { label: "Debug Consensus", key: "debug-consensus", href: "/debug-consensus" },
 ];
 
-export default function Navbar() {
+export default function Navbar(props: {shrink: boolean}) {
   const pathname = usePathname();
   return (
-    <nav className="bg-white shadow px-4 py-3 mb-6">
-      <div className="max-w-5xl mx-auto flex items-center justify-between">
+    <nav className="bg-white shadow px-4 py-3">
+      <div className={props.shrink ? "max-w-5xl mx-auto flex items-center justify-between": "mx-auto flex items-center justify-between"}>
         <div className="flex items-center gap-3">
           <Link href="/">
             <img src="/conspulse-logo.svg" alt="Conspulse Logo" className="h-9 w-9 cursor-pointer" />

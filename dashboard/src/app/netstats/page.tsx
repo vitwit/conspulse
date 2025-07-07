@@ -1,10 +1,20 @@
 "use client";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { getNodes, NodeStats } from "../lib/api";
 
 import dynamic from 'next/dynamic';
+
+import { AnimatePresence, motion } from "framer-motion";
+import equal from "fast-deep-equal";
+
+const rowVariants = {
+  initial: { opacity: 0, y: -20 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: 20 },
+};
+
 
 const NodeMap = dynamic(() => import('../components/NodeMap'), {
   ssr: false,
@@ -172,16 +182,26 @@ export default function NetstatsPage() {
     }
   }, []);
 
+
+  const prevNodesRef = useRef<NodeStats[]>([]);
+
   useEffect(() => {
-    fetchDump();
     const fetchNodes = () => {
       getNodes()
-        .then(setNodes)
+        .then((newNodes) => {
+          if (!equal(prevNodesRef.current, newNodes)) {
+            setNodes(newNodes);
+            prevNodesRef.current = newNodes;
+          }
+        })
         .catch(console.error);
     };
+
+    fetchDump(); // Your custom function
     fetchNodes();
-    const nodeInterval = setInterval(fetchNodes, 10000);
-    return () => clearInterval(nodeInterval);
+
+    const interval = setInterval(fetchNodes, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -243,7 +263,7 @@ export default function NetstatsPage() {
       nodeName: node.country,
       radius: 5,
       fillKey: 'success'
-      
+
     }
   })
 
@@ -265,10 +285,10 @@ export default function NetstatsPage() {
         </a>
         🚀
       </div>
-      <Navbar />
+      <Navbar shrink={false} />
       <main className="flex-1">
-        <section className="p-4 sm:p-8 ml-4 mr-4 mx-auto bg-white rounded-xl shadow-lg mb-8">
-          <h1 className="text-2xl font-bold mb-4 text-blue-800">Network Stats</h1>
+        <section className="p-4 sm:p-8 ml-4 mr-4 mt-2 mx-auto bg-white rounded-xl shadow-lg mb-8">
+          {/* <h1 className="text-2xl font-bold mb-4 text-blue-800">Network Stats</h1> */}
 
           {/* Modular Error and Loading Messages */}
           <ErrorAlert
@@ -286,58 +306,86 @@ export default function NetstatsPage() {
           /> */}
 
           {/* Summary Section */}
-                  <NodeMap data={nodesLocation} />
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+            {/* First row - 5 items */}
             <div className="flex flex-col items-center bg-blue-100 rounded-lg p-4 shadow-inner">
               <span className="text-gray-600">Latest Height</span>
               <span className="text-xl font-bold text-blue-900">{height}</span>
             </div>
-            <div className="flex flex-col items-center bg-green-100 rounded-lg p-4 shadow-inner">
-              <span className="text-gray-600">Round</span>
-              <span className="text-xl font-bold text-green-900">{round}</span>
-            </div>
+
             <div className="flex flex-col items-center bg-purple-100 rounded-lg p-4 shadow-inner">
               <span className="text-gray-600">Step</span>
               <span className="text-xl font-bold text-purple-900">{step}</span>
             </div>
+
+            <div className="flex flex-col items-center bg-green-100 rounded-lg p-4 shadow-inner">
+              <span className="text-gray-600">Round</span>
+              <span className="text-xl font-bold text-green-900">{round}</span>
+            </div>
+
             <div className="flex flex-col items-center bg-pink-100 rounded-lg p-4 shadow-inner">
               <span className="text-gray-600">Total Nodes</span>
               <span className="text-xl font-bold text-pink-900">{nPeers}</span>
             </div>
-            <div className="flex flex-col items-center bg-gray-100 rounded-lg p-4 shadow-inner">
-              <span className="text-gray-600">Last Block Time</span>
-              <span className="text-base font-bold text-gray-900">{lastBlockTime ? timeAgo(lastBlockTime, now) : "—"}</span>
-            </div>
-            <div className="flex flex-col items-center bg-orange-100 rounded-lg p-4 shadow-inner">
-              <span className="text-gray-600">Last Block Votes %</span>
-              <span className="text-xl font-bold text-orange-900">{lastBlockVotesInfo.percent}%</span>
-              <span className="text-xs text-gray-700">{lastBlockVotesInfo.voted}/{lastBlockVotesInfo.total}</span>
-            </div>
+
             <div className="flex flex-col items-center bg-gray-200 rounded-lg p-4 shadow-inner">
               <span className="text-gray-600">Active Validators</span>
               <span className="text-xl font-bold text-gray-900">{validators.length}</span>
             </div>
-            <div className="flex flex-col items-center bg-gray-100 rounded-lg p-4 shadow-inner col-span-2">
-              <span className="text-gray-600">Proposer</span>
-              <span className="text-base font-bold text-gray-900 flex items-center gap-1">
-                {proposer || "—"}
-                {proposer && <CopyButton value={proposer} />}
-              </span>
-            </div>
-            <div className="flex flex-col items-center bg-gray-100 rounded-lg p-4 shadow-inner">
-              <span className="text-gray-600">Proposer Voting Power</span>
-              <span className="text-base font-bold text-gray-900">{proposerObj?.voting_power || "—"}</span>
-            </div>
-            {lastCommitBitArray && (
-              <div className="flex flex-col items-center bg-gray-50 rounded-lg p-4 shadow-inner">
-                <span className="text-gray-600 mb-1">Last Block Votes</span>
-                <BitArrayCandles bitArray={lastCommitBitArray} validators={validators} />
-              </div>
-            )}
           </div>
 
+          {/* Second Row - 2/3 content area + 1/3 map */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Left side (2/3) */}
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* First inner row */}
+              <div className="flex flex-col items-center bg-gray-100 rounded-lg p-4 shadow-inner">
+                <span className="text-gray-600">Last Block Time</span>
+                <span className="text-base font-bold text-gray-900">
+                  {lastBlockTime ? timeAgo(lastBlockTime, now) : "—"}
+                </span>
+              </div>
+
+              <div className="flex flex-col items-center bg-orange-100 rounded-lg p-4 shadow-inner">
+                <span className="text-gray-600">Last Block Votes %</span>
+                <span className="text-xl font-bold text-orange-900">{lastBlockVotesInfo.percent}%</span>
+                {/* <span className="text-xs text-gray-700">
+        {lastBlockVotesInfo.voted}/{lastBlockVotesInfo.total}
+      </span> */}
+              </div>
+
+              <div className="flex flex-col items-center bg-orange-100 rounded-lg p-4 shadow-inner">
+                <span className="text-gray-600 mb-1">Last Block Votes</span>
+                {lastCommitBitArray && <BitArrayCandles bitArray={lastCommitBitArray} validators={validators} />}
+              </div>
+
+              {/* Second inner row */}
+              <div className="md:col-span-2 flex flex-col items-center bg-gray-100 rounded-lg p-4 shadow-inner">
+                <span className="text-gray-600">Proposer</span>
+                <span className="text-base font-bold text-gray-900 flex items-center gap-1">
+                  {proposer || "—"}
+                  {proposer && <CopyButton value={proposer} />}
+                </span>
+              </div>
+
+              <div className="flex flex-col items-center bg-gray-100 rounded-lg p-4 shadow-inner">
+                <span className="text-gray-600">Proposer Voting Power</span>
+                <span className="text-base font-bold text-gray-900">
+                  {proposerObj?.voting_power || "—"}
+                </span>
+              </div>
+            </div>
+
+            {/* Right side (1/3) */}
+            <div className="flex flex-col bg-white rounded-lg p-4 shadow-inner">
+              <span className="text-gray-600 mb-2">Node Map</span>
+              <NodeMap data={nodesLocation} />
+            </div>
+          </div>
+
+
           {/* Tabs for Peers and Last Block Consensus */}
-          <div className="sticky top-0 z-10 bg-white rounded-t-xl flex gap-2 border-b mb-4">
+          <div className="sticky top-0 z-10 bg-white rounded-t-xl flex gap-2 border-b mb-4 mt-2">
             <button
               className={`px-4 py-2 font-semibold rounded-t-lg focus:outline-none transition-colors ${activeTab === 'peers' ? 'bg-blue-100 text-blue-800 border-b-2 border-blue-500' : 'bg-gray-100 text-gray-600'}`}
               onClick={() => setActiveTab('peers')}
@@ -354,51 +402,83 @@ export default function NetstatsPage() {
           {activeTab === 'peers' && (
             <div className="overflow-x-auto mb-8">
               <table className="min-w-full text-xs bg-white rounded-lg shadow">
+                {/* ✅ Static Table Headers */}
                 <thead className="bg-gray-100">
                   <tr>
-                    <th className="px-4 py-2 text-left">Address</th>
-                    <th className="px-4 py-2 text-left">Moniker</th>
-                    <th className="px-4 py-2 text-left">Node ID</th>
-                    <th className="px-4 py-2 text-left">Earliest Height</th>
-                    <th className="px-4 py-2 text-left">Latest Height</th>
-                    <th className="px-4 py-2 text-left">Hash</th>
-                    <th className="px-4 py-2 text-left">Block Time</th>
-                    <th className="px-4 py-2 text-left">Syncing</th>
-                    <th className="px-4 py-2 text-left">Network</th>
-                    <th className="px-4 py-2 text-left">Voting Power</th>
-                    <th className="px-4 py-2 text-left">Peers</th>
-                    <th className="px-4 py-2 text-left">Version</th>
-                    <th className="px-4 py-2 text-left">OS</th>
-                    <th className="px-4 py-2 text-left">Go Version</th>
-                    <th className="px-4 py-2 text-left">Latency</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Address</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Moniker</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Node ID</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Earliest Height</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Latest Height</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Hash</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Block Time</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Syncing</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Network</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Voting Power</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Peers</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Version</th>
+                    <th className="px-4 py-2 text-left text-nowrap">OS</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Go Version</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Latency</th>
                   </tr>
                 </thead>
+
+                {/* ✅ Animated Body */}
                 <tbody>
                   {nodes.length === 0 && (
-                    <tr><td colSpan={8} className="text-center py-4 text-gray-400">No data available.</td></tr>
-                  )}
-                  {nodes.map((node: any, idx: number) => (
-                    <tr key={node.address || idx} className={`border-b last:border-b-0 ${node.rowColor}`}>
-                      <td className="px-4 py-2 font-mono">{node.address || "—"}</td>
-                      <td className="px-4 py-2 font-mono">{node.moniker || "—"}</td>
-                      <td className="px-4 py-2 font-mono break-all">{node.nodeID || "—"}</td>
-                      <td className="px-4 py-2 font-mono">{node.earliestBlockHeight || "—"}</td>
-                      <td className="px-4 py-2 font-mono">{node.latestBlockHeight || "—"}</td>
-                      <td className="px-4 py-2 font-mono">{node.latestAppHash || "—"}</td>
-                      <td className="px-4 py-2 font-mono">{node.blockTime ?? "—"}</td>
-                      <td className="px-4 py-2 font-mono">{node?.isSyncing ? "Yes" : "No"}</td>
-                      <td className="px-4 py-2 font-mono">{node.network || "—"}</td>
-                      <td className="px-4 py-2 font-mono">{node.votingPower || "—"}</td>
-                      <td className="px-4 py-2 font-mono">{node.peers.length || 0}</td>
-                      <td className="px-4 py-2 font-mono">{node.version}</td>
-                      <td className="px-4 py-2 font-mono">{node.os}</td>
-                      <td className="px-4 py-2 font-mono">{node.goVersion}</td>
-                      <td className="px-4 py-2 font-mono">{formatLatency(node.latency)}</td>
-
+                    <tr>
+                      <td colSpan={15} className="text-center py-4 text-gray-400">
+                        No data available.
+                      </td>
                     </tr>
-                  ))}
+                  )}
+                  <AnimatePresence>
+                    {nodes.map((node: NodeStats, idx: number) => (
+                      <motion.tr
+                        key={node.address || idx}
+                        layout
+                        initial="hidden"
+                        animate="visible"
+                        exit="exit"
+                        variants={rowVariants}
+                        transition={{ duration: 0.3 }}
+                        className={`border-b last:border-b-0`}
+                      >
+                        {[
+                          node.address,
+                          node.moniker,
+                          node.nodeID,
+                          node.earliestBlockHeight,
+                          node.latestBlockHeight,
+                          node.latestAppHash,
+                          node.blockTime ?? "—",
+                          node.isSyncing ? "Yes" : "No",
+                          node.network,
+                          node.votingPower,
+                          node.peers.length || 0,
+                          node.version,
+                          node.os,
+                          node.goVersion,
+                          formatLatency(node.latency),
+                        ].map((value, i) => (
+                          <td key={i} className="px-4 py-2 font-mono text-nowrap">
+                            <motion.div
+                              initial="initial"
+                              animate="animate"
+                              exit="exit"
+                              variants={rowVariants}
+                              transition={{ duration: 0.3 }}
+                            >
+                              {value || "—"}
+                            </motion.div>
+                          </td>
+                        ))}
+                      </motion.tr>
+                    ))}
+                  </AnimatePresence>
                 </tbody>
               </table>
+
             </div>
           )}
           {activeTab === 'consensus' && (
@@ -406,13 +486,13 @@ export default function NetstatsPage() {
               <table className="min-w-full text-xs bg-white rounded-lg shadow">
                 <thead className="bg-gray-100">
                   <tr>
-                    <th className="px-4 py-2 text-left">#</th>
-                    <th className="px-4 py-2 text-left">Validator Address</th>
-                    <th className="px-4 py-2 text-left">Voted</th>
-                    <th className="px-4 py-2 text-left">Vote Time</th>
-                    <th className="px-4 py-2 text-left">Voting Power</th>
-                    <th className="px-4 py-2 text-left">Voting Power %</th>
-                    <th className="px-4 py-2 text-left">Vote String</th>
+                    <th className="px-4 py-2 text-left text-nowrap">#</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Validator Address</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Voted</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Vote Time</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Voting Power</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Voting Power %</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Vote String</th>
                   </tr>
                 </thead>
                 <tbody>
