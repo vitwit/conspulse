@@ -33,3 +33,16 @@ body {
   font-size: 12px;
   pointer-events: none;
 }
+
+@layer components {
+  .datamaps-bubble {
+    @apply animate-none;
+  }
+}
+
+svg .datamaps-bubble,
+svg circle {
+  animation: none !important;
+  transition: none !important;
+  opacity: 1 !important;
+}

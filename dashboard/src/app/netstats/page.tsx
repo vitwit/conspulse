@@ -4,10 +4,13 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { getNodes, NodeStats } from "../lib/api";
 
+import moment from 'moment';
 import dynamic from 'next/dynamic';
 
 import { AnimatePresence, motion } from "framer-motion";
+import ShortName from "../components/ShortName";
 import equal from "fast-deep-equal";
+import NodeVersionsChart from "../components/NodeVersions";
 
 const rowVariants = {
   initial: { opacity: 0, y: -20 },
@@ -142,8 +145,10 @@ export default function NetstatsPage() {
   const [errorDump, setErrorDump] = useState<string | null>(null);
   const [errorNet, setErrorNet] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
-  const [activeTab, setActiveTab] = useState<'peers' | 'consensus'>('peers');
+  const [activeTab, setActiveTab] = useState<'peers' | 'consensus' | 'versions'>('peers');
   const [nodes, setNodes] = useState<NodeStats[]>([]);
+
+  const [versions, setVersions] = useState<string[]>([]);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -174,6 +179,7 @@ export default function NetstatsPage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setNetInfo(data);
+
     } catch (err: any) {
       setErrorNet(err.message || "Unknown error");
       setNetInfo(null);
@@ -185,6 +191,7 @@ export default function NetstatsPage() {
 
   const prevNodesRef = useRef<NodeStats[]>([]);
 
+  const [stats, setStats] = useState();
   useEffect(() => {
     const fetchNodes = () => {
       getNodes()
@@ -192,12 +199,16 @@ export default function NetstatsPage() {
           if (!equal(prevNodesRef.current, newNodes)) {
             setNodes(newNodes);
             prevNodesRef.current = newNodes;
+
+            setVersions(newNodes.map((node: NodeStats) => {
+              return node.version
+            }));
           }
         })
         .catch(console.error);
     };
 
-    fetchDump(); // Your custom function
+    fetchDump();
     fetchNodes();
 
     const interval = setInterval(fetchNodes, 10000);
@@ -385,15 +396,21 @@ export default function NetstatsPage() {
 
 
           {/* Tabs for Peers and Last Block Consensus */}
-          <div className="sticky top-0 z-10 bg-white rounded-t-xl flex gap-2 border-b mb-4 mt-2">
+          <div className="sticky top-0 z-10 bg-white rounded-t-xl flex gap-2 border-b mb-4 mt-4">
             <button
-              className={`px-4 py-2 font-semibold rounded-t-lg focus:outline-none transition-colors ${activeTab === 'peers' ? 'bg-blue-100 text-blue-800 border-b-2 border-blue-500' : 'bg-gray-100 text-gray-600'}`}
+              className={`px-4 py-2 font-semibold rounded-t-lg focus:outline-none transition-colors hover:cursor-pointer ${activeTab === 'peers' ? 'bg-blue-100 text-blue-800 border-b-2 border-blue-500' : 'bg-gray-100 text-gray-600'}`}
               onClick={() => setActiveTab('peers')}
             >
               Nodes
             </button>
             <button
-              className={`px-4 py-2 font-semibold rounded-t-lg focus:outline-none transition-colors ${activeTab === 'consensus' ? 'bg-blue-100 text-blue-800 border-b-2 border-blue-500' : 'bg-gray-100 text-gray-600'}`}
+              className={`px-4 py-2 font-semibold rounded-t-lg focus:outline-none transition-colors hover:cursor-pointer ${activeTab === 'versions' ? 'bg-blue-100 text-blue-800 border-b-2 border-blue-500' : 'bg-gray-100 text-gray-600'}`}
+              onClick={() => setActiveTab('versions')}
+            >
+              Node Versions
+            </button>
+            <button
+              className={`px-4 py-2 font-semibold rounded-t-lg focus:outline-none transition-colors hover:cursor-pointer ${activeTab === 'consensus' ? 'bg-blue-100 text-blue-800 border-b-2 border-blue-500' : 'bg-gray-100 text-gray-600'}`}
               onClick={() => setActiveTab('consensus')}
             >
               Last Block Consensus
@@ -405,14 +422,14 @@ export default function NetstatsPage() {
                 {/* ✅ Static Table Headers */}
                 <thead className="bg-gray-100">
                   <tr>
-                    <th className="px-4 py-2 text-left text-nowrap">Address</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Validator Address</th>
                     <th className="px-4 py-2 text-left text-nowrap">Moniker</th>
                     <th className="px-4 py-2 text-left text-nowrap">Node ID</th>
                     <th className="px-4 py-2 text-left text-nowrap">Earliest Height</th>
                     <th className="px-4 py-2 text-left text-nowrap">Latest Height</th>
                     <th className="px-4 py-2 text-left text-nowrap">Hash</th>
                     <th className="px-4 py-2 text-left text-nowrap">Block Time</th>
-                    <th className="px-4 py-2 text-left text-nowrap">Syncing</th>
+                    <th className="px-4 py-2 text-left text-nowrap">Caught Up</th>
                     <th className="px-4 py-2 text-left text-nowrap">Network</th>
                     <th className="px-4 py-2 text-left text-nowrap">Voting Power</th>
                     <th className="px-4 py-2 text-left text-nowrap">Peers</th>
@@ -445,14 +462,14 @@ export default function NetstatsPage() {
                         className={`border-b last:border-b-0`}
                       >
                         {[
-                          node.address,
+                          <ShortName key={node.address} value={node.address} maxLength={9}/>,
                           node.moniker,
-                          node.nodeID,
+                          <ShortName key={node.nodeID} value={node.nodeID} maxLength={7}/>,
                           node.earliestBlockHeight,
                           node.latestBlockHeight,
-                          node.latestAppHash,
-                          node.blockTime ?? "—",
-                          node.isSyncing ? "Yes" : "No",
+                          <ShortName key={node.latestAppHash} value={node.latestAppHash} maxLength={7}/>,
+                          moment(node.blockTime).fromNow() ?? "—",
+                          node.isSyncing ? "Syncing" : "Yes",
                           node.network,
                           node.votingPower,
                           node.peers.length || 0,
@@ -480,6 +497,9 @@ export default function NetstatsPage() {
               </table>
 
             </div>
+          )}
+          {activeTab === 'versions' && (
+            <NodeVersionsChart versions={versions} />
           )}
           {activeTab === 'consensus' && (
             <div className="overflow-x-auto">
@@ -509,7 +529,7 @@ export default function NetstatsPage() {
                     return (
                       <tr key={v.address} className={voted ? "bg-green-50" : "bg-red-50"}>
                         <td className="px-4 py-2 font-mono">{idx}</td>
-                        <td className="px-4 py-2 font-mono break-all">{v.address}</td>
+                        <td className="px-4 py-2 font-mono break-all">{ShortName({value: v.address, maxLength: 19})}</td>
                         <td className="px-4 py-2 font-mono">{voted ? "✅" : "❌"}</td>
                         <td className="px-4 py-2 font-mono">{voteTime ? timeAgo(voteTime, now) : "—"}</td>
                         <td className="px-4 py-2 font-mono">{votingPower}</td>

@@ -78,6 +78,7 @@ const NodeMap: React.FC<NodeMapProps> = ({ data }) => {
     <div className="w-full aspect-[11/5] relative">
       <div
         ref={mapContainer}
+        style={{ animation: 'none', transition: 'none' }}
         className="w-full h-full"
       />
     </div>
