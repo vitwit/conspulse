@@ -65,8 +65,8 @@ export function BlockPropagationGraph({
       legend: {
         display: false,
       },
-      title: {
-        display: true,
+      title: {  
+        display: false,
         text: "Block Propagation Delay Distribution (in seconds)",
       },
     },

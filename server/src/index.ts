@@ -1,4 +1,4 @@
-import express, {Request, Response} from 'express';
+import express, { Request, Response } from 'express';
 import logger from './logger/logger';
 import { exit } from 'process';
 import db from './db';
@@ -76,15 +76,10 @@ let averageBlockTime: number = 0;
 
 const blockTimeBuckets: { [key: string]: number } = {
     '0-2s': 0,
-    '2-3s': 0,
-    '3-4s': 0,
-    '4-5s': 0,
-    '5-6s': 0,
-    '6-7s': 0,
-    '7-8s': 0,
-    '8-9s': 0,
-    '9-10s': 0,
-    '10s+': 0,
+    '2-4s': 0,
+    '4-6s': 0,
+    '6-8s': 0,
+    '8-10s': 0,
 };
 
 
@@ -129,15 +124,11 @@ function connect(): void {
                     const diffSec = diffMs / 1000;
 
                     if (diffSec <= 2) blockTimeBuckets['0-2s']++;
-                    else if (diffSec <= 3) blockTimeBuckets['2-3s']++;
-                    else if (diffSec <= 4) blockTimeBuckets['3-4s']++;
-                    else if (diffSec <= 5) blockTimeBuckets['4-5s']++;
-                    else if (diffSec <= 6) blockTimeBuckets['5-6s']++;
-                    else if (diffSec <= 7) blockTimeBuckets['6-7s']++;
-                    else if (diffSec <= 8) blockTimeBuckets['7-8s']++;
-                    else if (diffSec <= 9) blockTimeBuckets['8-9s']++;
-                    else if (diffSec <= 10) blockTimeBuckets['9-10s']++;
-                    else blockTimeBuckets['10s+']++;
+                    else if (diffSec <= 4) blockTimeBuckets['2-4s']++;
+                    else if (diffSec <= 6) blockTimeBuckets['4-6s']++;
+                    else if (diffSec <= 8) blockTimeBuckets['6-8s']++;
+                    else if (diffSec <= 10) blockTimeBuckets['8-10s']++;
+                    else blockTimeBuckets['8-10s']++;
                 }
 
                 lastBlockTime = dayjs(block.header.time);

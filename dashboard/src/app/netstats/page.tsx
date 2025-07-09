@@ -270,22 +270,23 @@ export default function NetstatsPage() {
     fetchNodes();
 
     const interval = setInterval(() => {
+      fetchDump();
       fetchNodes();
       fetchStats();
-    }, 10000);
+    }, 5_000);
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     fetchNetInfo();
-    const interval = setInterval(fetchNetInfo, 10000);
+    const interval = setInterval(fetchNetInfo, 5_000);
     return () => clearInterval(interval);
   }, [fetchNetInfo]);
 
   useEffect(() => {
     if (activeTab === "consensus") {
       fetchDump();
-      const interval = setInterval(fetchDump, 10000);
+      const interval = setInterval(fetchDump, 5_000);
       return () => clearInterval(interval);
     }
   }, [fetchDump, activeTab]);
@@ -403,7 +404,7 @@ export default function NetstatsPage() {
                     LATEST HEIGHT
                   </div>
                   <div className="text-5xl font-light font-source-sans text-orange-500">
-                    #{height}
+                    #{parseInt(height).toLocaleString()}
                   </div>
                 </div>
               </div>
@@ -418,7 +419,7 @@ export default function NetstatsPage() {
                   <div className="text-sm font-bold text-gray-700 mb-1">
                     STEP
                   </div>
-                  <div className="text-5xl font-light font-source-sans text-orange-500">
+                  <div className="text-4xl font-light font-source-sans text-orange-500">
                     {step}
                   </div>
                 </div>
@@ -433,7 +434,7 @@ export default function NetstatsPage() {
                   <div className="text-sm font-bold text-gray-700 mb-1">
                     ROUND
                   </div>
-                  <div className="text-5xl font-light font-source-sans text-green-900">
+                  <div className="text-4xl font-light font-source-sans text-green-900">
                     {round}
                   </div>
                 </div>
@@ -448,7 +449,7 @@ export default function NetstatsPage() {
                   <div className="text-sm font-bold text-gray-700 mb-1">
                     TOTAL NODES
                   </div>
-                  <div className="text-5xl font-light font-source-sans text-pink-900">
+                  <div className="text-4xl font-light font-source-sans text-pink-900">
                     {nPeers}
                   </div>
                 </div>
@@ -463,7 +464,7 @@ export default function NetstatsPage() {
                   <div className="text-sm font-bold text-gray-700 mb-1">
                     ACTIVE VALIDATORS
                   </div>
-                  <div className="text-5xl font-light font-source-sans text-gray-900">
+                  <div className="text-4xl font-light font-source-sans text-gray-900">
                     {validators.length}
                   </div>
                 </div>
@@ -484,7 +485,7 @@ export default function NetstatsPage() {
                     <div className="text-sm font-bold text-amber-700 mb-1">
                       LAST BLOCK TIME
                     </div>
-                    <div className="text-5xl font-light font-source-sans text-amber-900">
+                    <div className="text-4xl font-light font-source-sans text-amber-900">
                       {lastBlockTime ? timeAgo(lastBlockTime, now) : "—"}
                     </div>
                   </div>
@@ -499,7 +500,7 @@ export default function NetstatsPage() {
                     <div className="text-sm font-bold text-lime-700 mb-1">
                       AVERAGE BLOCK TIME
                     </div>
-                    <div className="text-5xl font-light font-source-sans text-lime-900">
+                    <div className="text-4xl font-light font-source-sans text-lime-900">
                       {stats?.averageBlockTime ? stats.averageBlockTime : "—"}
                     </div>
                   </div>
@@ -515,7 +516,7 @@ export default function NetstatsPage() {
                     <div className="text-sm font-bold text-gray-700 mb-1">
                       LAST BLOCK VOTES %
                     </div>
-                    <div className="text-5xl font-light font-source-sans text-orange-900">
+                    <div className="text-4xl font-light font-source-sans text-orange-900">
                       {lastBlockVotesInfo.percent}%
                     </div>
                   </div>
@@ -523,13 +524,14 @@ export default function NetstatsPage() {
 
                 <div className="flex gap-4 items-center bg-orange-50 p-4 shadow-sm border border-orange-200">
                   <Vote
-                    className="w-20 h-20 text-orange-600 mb-2"
+                    className="w-20 h-20 text-orange-600"
                     strokeWidth={0.8}
                   />
                   <div>
-                    <span className="text-sm font-bold text-gray-700 mb-1">
+                    {" "}
+                    <div className="text-sm font-bold text-gray-700 mb-1">
                       LAST BLOCK VOTES
-                    </span>
+                    </div>
                     {lastCommitBitArray && (
                       <BitArrayCandles
                         bitArray={lastCommitBitArray}
@@ -546,12 +548,11 @@ export default function NetstatsPage() {
                     strokeWidth={0.8}
                   />
                   <div>
-                    {" "}
                     <div className="text-sm font-bold text-teal-700 mb-1">
                       PROPOSER
                     </div>
-                    <div className="text-5xl font-light font-source-sans text-teal-900 flex items-center gap-1">
-                      {ShortName({ value: proposer, maxLength: 4, iconColor: "text-teal-600" }) || "—"}
+                    <div className="text-3xl font-light font-source-sans text-teal-900 flex items-center gap-1">
+                      {ShortName({ value: proposer, maxLength: 5, iconColor: "text-teal-600" }) || "—"}
                     </div>
                   </div>
                 </div>
@@ -572,7 +573,10 @@ export default function NetstatsPage() {
                   </div>
                 </div> */}
 
-                <div className="flex gap-4 items-center bg-gray-50 p-4 shadow-sm border border-gray-200">
+                <div className="items-center bg-gray-50 p-4 shadow-sm border border-gray-200">
+                  <div className="text-sm font-bold text-teal-700 mb-1">
+                    BLOCK PROPAGATION
+                  </div>
                   <BlockPropagationGraph data={stats?.blockPropagation} />
                 </div>
               </div>
@@ -586,31 +590,28 @@ export default function NetstatsPage() {
           {/* Tabs for Peers and Last Block Consensus */}
           <div className="sticky top-0 z-10 bg-white rounded-t-xl flex gap-2 border-b mb-4 mt-4">
             <button
-              className={`px-4 py-2 font-semibold rounded-t-lg focus:outline-none transition-colors hover:cursor-pointer ${
-                activeTab === "peers"
+              className={`px-4 py-2 font-semibold rounded-t-lg focus:outline-none transition-colors hover:cursor-pointer ${activeTab === "peers"
                   ? "bg-blue-100 text-blue-800 border-b-2 border-blue-500"
                   : "bg-gray-100 text-gray-600"
-              }`}
+                }`}
               onClick={() => setActiveTab("peers")}
             >
               Nodes
             </button>
             <button
-              className={`px-4 py-2 font-semibold rounded-t-lg focus:outline-none transition-colors hover:cursor-pointer ${
-                activeTab === "versions"
+              className={`px-4 py-2 font-semibold rounded-t-lg focus:outline-none transition-colors hover:cursor-pointer ${activeTab === "versions"
                   ? "bg-blue-100 text-blue-800 border-b-2 border-blue-500"
                   : "bg-gray-100 text-gray-600"
-              }`}
+                }`}
               onClick={() => setActiveTab("versions")}
             >
               Node Versions
             </button>
             <button
-              className={`px-4 py-2 font-semibold rounded-t-lg focus:outline-none transition-colors hover:cursor-pointer ${
-                activeTab === "consensus"
+              className={`px-4 py-2 font-semibold rounded-t-lg focus:outline-none transition-colors hover:cursor-pointer ${activeTab === "consensus"
                   ? "bg-blue-100 text-blue-800 border-b-2 border-blue-500"
                   : "bg-gray-100 text-gray-600"
-              }`}
+                }`}
               onClick={() => setActiveTab("consensus")}
             >
               Last Block Consensus
@@ -697,7 +698,7 @@ export default function NetstatsPage() {
                             value={node.latestAppHash}
                             maxLength={7}
                           />,
-                          moment(node.blockTime).fromNow() ?? "—",
+                          moment.utc(node.blockTime).local().fromNow() ?? "—",
                           node.isSyncing ? "Syncing" : "Yes",
                           node.network,
                           node.votingPower,
