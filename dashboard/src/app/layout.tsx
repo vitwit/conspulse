@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
 import { TendermintProvider } from "./context/TendermintListener";
 
@@ -13,6 +13,13 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
+
+const sourceSans3 = Source_Sans_3({
+  variable: "--font-source-sans-3",
+  subsets: ["latin"],
+  weight: ["200", "300", "400", "500", "600", "700"], // Add weights you need
+});
+
 
 export const metadata: Metadata = {
   title: "Conspulse - Tendermint Validator Dashboard",
@@ -60,7 +67,7 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${sourceSans3.variable} antialiased`}
       >
         <TendermintProvider >
           {children}

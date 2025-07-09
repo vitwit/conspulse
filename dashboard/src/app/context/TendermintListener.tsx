@@ -31,7 +31,7 @@ export const TendermintProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const socket = new WebSocket("ws://localhost:26657/websocket");
+    const socket = new WebSocket("ws://192.168.1.83:26657/websocket");
     socketRef.current = socket;
 
     const subscriptions = [

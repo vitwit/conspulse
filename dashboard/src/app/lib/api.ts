@@ -22,7 +22,7 @@ export interface NodeStats {
     latency: number;
 }
 
-type BlockPropagation = {
+export type BlockPropagation = {
     "0-2s": number;
     "2-3s": number;
     "3-4s": number;

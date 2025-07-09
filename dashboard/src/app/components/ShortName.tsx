@@ -7,9 +7,10 @@ import { faClipboard, faCheck } from '@fortawesome/free-solid-svg-icons';
 type ShortNameProps = {
     value: string;
     maxLength: number;
+    iconColor?: string;
 };
 
-export default function ShortName({ value, maxLength }: ShortNameProps) {
+export default function ShortName({ value, maxLength, iconColor = "text-gray-600" }: ShortNameProps) {
     const [copied, setCopied] = useState(false);
 
     const shorten = (str: string, chars = 6): string => {
@@ -35,7 +36,7 @@ export default function ShortName({ value, maxLength }: ShortNameProps) {
                     border: 'none',
                     padding: 0,
                 }}
-                className='text-gray-600'
+                className={`${iconColor}`}
                 aria-label="Copy to clipboard"
             >
                 <FontAwesomeIcon icon={copied ? faCheck : faClipboard} />
