@@ -45,6 +45,27 @@ type CutoffResult = {
     minHeightToKeep: number;
 };
 
+type Block = {
+    height: number;
+    time: string;
+    chain_id: string;
+    proposer_address: string;
+
+    data_hash: string;
+    app_hash: string;
+    consensus_hash: string;
+
+    last_commit_hash: string;
+    last_results_hash: string;
+
+    validators_hash: string;
+    next_validators_hash: string;
+
+    transactions: number;
+
+    evidence_hash: string;
+};
+
 
 
 export class Database {
@@ -240,6 +261,47 @@ ORDER BY blockTime DESC;
             logger.info('Cleanup completed.');
         } catch (error) {
             logger.error('Error during cleanup:', error);
+        }
+    }
+
+    async insertBlock(block: Block): Promise<void> {
+        try {
+            await this.client.insert({
+                table: 'blocks',
+                values: [block],
+                format: 'JSONEachRow',
+            });
+
+            logger.info(`Block inserted: height=${block.height}, chain_id=${block.chain_id}`);
+        } catch (err) {
+            logger.error(`Failed to insert block: ${err}`);
+            throw err;
+        }
+    }
+
+    async getBlocksPaginated(
+        page: number = 1,
+        limit: number = 500
+    ): Promise<Block[]> {
+        const offset = (page - 1) * limit;
+        const query = `
+        SELECT *
+        FROM blocks
+        ORDER BY time DESC, height DESC
+        LIMIT ${limit} OFFSET ${offset}
+    `;
+
+        try {
+            const result = await this.client.query({
+                query,
+                format: 'JSONEachRow',
+            });
+
+            const data = await result.json();
+            return data as Block[];
+        } catch (err) {
+            logger.error(`Failed to fetch paginated blocks: ${err}`);
+            throw err;
         }
     }
 }

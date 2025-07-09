@@ -11,6 +11,7 @@ const configSchema = z.object({
   CLICKHOUSE_PASSWORD: z.string(),
   CLICKHOUSE_DATABASE: z.string(),
   PORT: z.string().optional().default('3000'),
+  RPC_URL: z.string(),
 });
 
 const parsed = configSchema.safeParse(process.env);

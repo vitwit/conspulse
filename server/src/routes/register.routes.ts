@@ -6,6 +6,6 @@ const router = Router();
 
 router.post('/register', registerNode);
 router.post('/submit-stats', submitStats);
-router.get('/stats', getStats);
+router.get('/node-stats', getStats);
 
 export default router;

@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { getNodes, NodeStats } from "../lib/api";
+import { getNodes, getStats, NetworkStats, NodeStats } from "../lib/api";
 
 import moment from 'moment';
 import dynamic from 'next/dynamic';
@@ -191,7 +191,7 @@ export default function NetstatsPage() {
 
   const prevNodesRef = useRef<NodeStats[]>([]);
 
-  const [stats, setStats] = useState();
+  const [stats, setStats] = useState<NetworkStats>();
   useEffect(() => {
     const fetchNodes = () => {
       getNodes()
@@ -208,10 +208,20 @@ export default function NetstatsPage() {
         .catch(console.error);
     };
 
+    const fetchStats = () => {
+      getStats().then(result => {
+        setStats(result);
+      })
+        .catch(console.error)
+    }
+
     fetchDump();
     fetchNodes();
 
-    const interval = setInterval(fetchNodes, 10000);
+    const interval = setInterval(() => {
+      fetchNodes();
+      fetchStats();
+    }, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -315,7 +325,6 @@ export default function NetstatsPage() {
               ...(loadingNet ? ["Network info"] : []),
             ]}
           /> */}
-
           {/* Summary Section */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
             {/* First row - 5 items */}
@@ -356,6 +365,12 @@ export default function NetstatsPage() {
                   {lastBlockTime ? timeAgo(lastBlockTime, now) : "—"}
                 </span>
               </div>
+              <div className="flex flex-col items-center bg-gray-100 rounded-lg p-4 shadow-inner">
+                <span className="text-gray-600">Average Block Time</span>
+                <span className="text-base font-bold text-gray-900">
+                  {stats?.averageBlockTime ? stats.averageBlockTime : "—"}
+                </span>
+              </div>
 
               <div className="flex flex-col items-center bg-orange-100 rounded-lg p-4 shadow-inner">
                 <span className="text-gray-600">Last Block Votes %</span>
@@ -371,11 +386,10 @@ export default function NetstatsPage() {
               </div>
 
               {/* Second inner row */}
-              <div className="md:col-span-2 flex flex-col items-center bg-gray-100 rounded-lg p-4 shadow-inner">
+              <div className="flex flex-col items-center bg-gray-100 rounded-lg p-4 shadow-inner">
                 <span className="text-gray-600">Proposer</span>
                 <span className="text-base font-bold text-gray-900 flex items-center gap-1">
-                  {proposer || "—"}
-                  {proposer && <CopyButton value={proposer} />}
+                  {ShortName({ value: proposer, maxLength: 12 }) || "—"}
                 </span>
               </div>
 
@@ -462,12 +476,12 @@ export default function NetstatsPage() {
                         className={`border-b last:border-b-0`}
                       >
                         {[
-                          <ShortName key={node.address} value={node.address} maxLength={9}/>,
+                          <ShortName key={node.address} value={node.address} maxLength={9} />,
                           node.moniker,
-                          <ShortName key={node.nodeID} value={node.nodeID} maxLength={7}/>,
+                          <ShortName key={node.nodeID} value={node.nodeID} maxLength={7} />,
                           node.earliestBlockHeight,
                           node.latestBlockHeight,
-                          <ShortName key={node.latestAppHash} value={node.latestAppHash} maxLength={7}/>,
+                          <ShortName key={node.latestAppHash} value={node.latestAppHash} maxLength={7} />,
                           moment(node.blockTime).fromNow() ?? "—",
                           node.isSyncing ? "Syncing" : "Yes",
                           node.network,
@@ -529,7 +543,7 @@ export default function NetstatsPage() {
                     return (
                       <tr key={v.address} className={voted ? "bg-green-50" : "bg-red-50"}>
                         <td className="px-4 py-2 font-mono">{idx}</td>
-                        <td className="px-4 py-2 font-mono break-all">{ShortName({value: v.address, maxLength: 19})}</td>
+                        <td className="px-4 py-2 font-mono break-all">{ShortName({ value: v.address, maxLength: 19 })}</td>
                         <td className="px-4 py-2 font-mono">{voted ? "✅" : "❌"}</td>
                         <td className="px-4 py-2 font-mono">{voteTime ? timeAgo(voteTime, now) : "—"}</td>
                         <td className="px-4 py-2 font-mono">{votingPower}</td>

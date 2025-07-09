@@ -12,12 +12,6 @@ type ShortNameProps = {
 export default function ShortName({ value, maxLength }: ShortNameProps) {
     const [copied, setCopied] = useState(false);
 
-    // const shorten = (str: string, max: number) => {
-    //     if (str.length <= max) return str;
-    //     const keep = Math.floor((max - 3) / 2);
-    //     return `${str.slice(0, keep)}...${str.slice(-keep)}`;
-    // };
-
     const shorten = (str: string, chars = 6): string => {
         if (!str) return '';
         return `${str.slice(0, chars)}...${str.slice(-chars)}`;
@@ -41,6 +35,7 @@ export default function ShortName({ value, maxLength }: ShortNameProps) {
                     border: 'none',
                     padding: 0,
                 }}
+                className='text-gray-600'
                 aria-label="Copy to clipboard"
             >
                 <FontAwesomeIcon icon={copied ? faCheck : faClipboard} />
