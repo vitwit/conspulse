@@ -787,7 +787,7 @@ export default function NetstatsPage() {
                       >
                         <td className="px-4 py-2 font-mono">{idx}</td>
                         <td className="px-4 py-2 font-mono break-all">
-                          {ShortName({ value: v.address, maxLength: 19 })}
+                          {v.address}
                         </td>
                         <td className="px-4 py-2 font-mono">
                           {voted ? "✅" : "❌"}
