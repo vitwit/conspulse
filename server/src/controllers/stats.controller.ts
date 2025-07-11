@@ -1,9 +1,9 @@
-import { Request, Response } from 'express';
 import { z } from 'zod';
 import db from '../db';
 import { config } from '../config';
 import formatZodErrors from '../utils/zod';
 import logger from '../logger/logger';
+import { blockCache } from './cache';
 
 export const StatsSchema = z.object({
     address: z.string(),
@@ -81,10 +81,13 @@ export const getStats = async (
 ) => {
     try {
         const nodes = await db.getNodes();
+
         return res.status(200).json({
-            nodes
+            nodes,
+            blocksWindow: blockCache
+
         });
-    } catch(err) {
+    } catch (err) {
         logger.error(`Internal server error ${err}`);
         return res.status(500).json({ message: 'Internal server error' });
     }

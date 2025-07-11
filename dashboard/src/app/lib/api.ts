@@ -35,9 +35,16 @@ export type BlockPropagation = {
     "10s+": number;
 };
 
+type BlockInfo = {
+    blockNumber: number;
+    blockTime: number;
+    txnCount: number;
+};
+
 export type NetworkStats = {
     averageBlockTime: string;
     blockPropagation?: BlockPropagation;
+    blocksWindow: BlockInfo[];
 };
 
 
@@ -78,7 +85,8 @@ export async function getStats(): Promise<NetworkStats> {
         } else {
             return {
                 averageBlockTime: "0s",
-                blockPropagation: undefined
+                blockPropagation: undefined,
+                blocksWindow: []
             };
         }
     } catch (error) {

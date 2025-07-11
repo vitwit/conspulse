@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { getNodes, getStats, NetworkStats, NodeStats } from "../lib/api";
@@ -20,12 +20,10 @@ import {
   Clock,
   Timer,
   Vote,
-  MapPin,
   User,
-  Zap,
 } from "lucide-react";
-import { div } from "framer-motion/client";
 import { BlockPropagationGraph } from "./components/BlockPropagationGraph";
+import BarChart from "./components/Barchart";
 
 const rowVariants = {
   initial: { opacity: 0, y: -20 },
@@ -76,64 +74,6 @@ function ErrorAlert({
         ))}
       </ul>
     </div>
-  );
-}
-
-function LoadingNotice({ loadingItems }: { loadingItems: string[] }) {
-  if (loadingItems.length === 0) return null;
-  return (
-    <div className="mb-4 p-4 bg-yellow-100 border border-yellow-300 text-yellow-800 rounded">
-      <p className="font-semibold">Loading...</p>
-      <p className="text-sm">{loadingItems.join(" and ")} in progress.</p>
-    </div>
-  );
-}
-
-function CopyButton({
-  value,
-  className = "",
-}: {
-  value: string;
-  className?: string;
-}) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <span className={"inline-flex items-center gap-1 " + className}>
-      <button
-        type="button"
-        aria-label="Copy to clipboard"
-        title={copied ? "Copied!" : "Copy"}
-        onClick={() => {
-          navigator.clipboard.writeText(value);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1200);
-        }}
-        className="ml-1 p-1 rounded hover:bg-gray-200 focus:outline-none"
-        tabIndex={0}
-      >
-        <svg width="16" height="16" fill="none" viewBox="0 0 20 20">
-          <rect
-            x="6"
-            y="6"
-            width="9"
-            height="9"
-            rx="2"
-            stroke="#555"
-            strokeWidth="1.5"
-          />
-          <rect
-            x="3"
-            y="3"
-            width="9"
-            height="9"
-            rx="2"
-            stroke="#bbb"
-            strokeWidth="1.5"
-          />
-        </svg>
-      </button>
-      {copied && <span className="text-xs text-green-600">Copied!</span>}
-    </span>
   );
 }
 
@@ -199,6 +139,38 @@ export default function NetstatsPage() {
   const [nodes, setNodes] = useState<NodeStats[]>([]);
 
   const [versions, setVersions] = useState<string[]>([]);
+
+  const [sortBy, setSortBy] = useState<string>('moniker'); // default sort
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (key: string) => {
+    if (sortBy === key) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(key);
+      setSortDirection('asc');
+    }
+  };
+
+  const sortedNodes = useMemo(() => {
+    return [...nodes].sort((a, b) => {
+      const aVal = a[sortBy as keyof NodeStats];
+      const bVal = b[sortBy as keyof NodeStats];
+
+      if (aVal == null) return 1;
+      if (bVal == null) return -1;
+
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+
+      return sortDirection === 'asc'
+        ? String(aVal).localeCompare(String(bVal))
+        : String(bVal).localeCompare(String(aVal));
+    });
+  }, [nodes, sortBy, sortDirection]);
+
+
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -391,7 +363,7 @@ export default function NetstatsPage() {
           /> */}
           <div>
             {/* Summary Section */}
-            <div className="grid grid-cols-1 md:grid-cols-5">
+            <div className="grid grid-cols-1 md:grid-cols-6">
               {/* First row - 5 items */}
               <div className="flex gap-4 items-center bg-blue-50 p-4 shadow-sm border border-blue-200">
                 <Layers
@@ -405,6 +377,21 @@ export default function NetstatsPage() {
                   </div>
                   <div className="text-5xl font-light font-source-sans text-orange-500">
                     #{parseInt(height).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-4 items-center bg-lime-50 p-4 shadow-sm border border-gray-200">
+                <Timer
+                  className="w-20 h-20 text-lime-900 mb-2"
+                  strokeWidth={0.8}
+                />
+                <div>
+                  <div className="text-sm font-bold text-lime-700 mb-1">
+                    AVERAGE BLOCK TIME
+                  </div>
+                  <div className="text-4xl font-light font-source-sans text-lime-900">
+                    {stats?.averageBlockTime ? stats.averageBlockTime : "—"}
                   </div>
                 </div>
               </div>
@@ -472,9 +459,9 @@ export default function NetstatsPage() {
             </div>
 
             {/* Second Row - 2/3 content area + 1/3 map */}
-            <div className="grid grid-cols-1 md:grid-cols-5">
+            <div className="grid grid-cols-1 md:grid-cols-6">
               {/* Left side (2/3) */}
-              <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-3">
+              <div className="md:col-span-4 grid grid-cols-1 md:grid-cols-4">
                 {/* First inner row */}
                 <div className="flex gap-4 items-center bg-amber-50 p-4 shadow-sm border border-gray-200">
                   <Clock
@@ -491,20 +478,7 @@ export default function NetstatsPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-4 items-center bg-lime-50 p-4 shadow-sm border border-gray-200">
-                  <Timer
-                    className="w-20 h-20 text-lime-900 mb-2"
-                    strokeWidth={0.8}
-                  />
-                  <div>
-                    <div className="text-sm font-bold text-lime-700 mb-1">
-                      AVERAGE BLOCK TIME
-                    </div>
-                    <div className="text-4xl font-light font-source-sans text-lime-900">
-                      {stats?.averageBlockTime ? stats.averageBlockTime : "—"}
-                    </div>
-                  </div>
-                </div>
+
 
                 <div className="flex gap-4 items-center bg-orange-50 p-4 shadow-sm border border-orange-200">
                   <Vote
@@ -557,29 +531,45 @@ export default function NetstatsPage() {
                   </div>
                 </div>
 
-                {/* <div className="flex gap-4 items-center bg-gray-50 p-4 shadow-sm border border-gray-200">
-                  <Zap
+                <div className="flex gap-4 items-center bg-gray-50 p-4 shadow-sm border border-gray-200">
+
+                  <Shield
                     className="w-20 h-20 text-gray-900 mb-2"
                     strokeWidth={0.8}
                   />
                   <div>
-                    {" "}
                     <div className="text-sm font-bold text-gray-700 mb-1">
                       PROPOSER VOTING POWER
                     </div>
-                    <div className="text-5xl font-light font-source-sans text-gray-900">
+                    <div className="text-4xl font-light font-source-sans text-gray-900">
                       {proposerObj?.voting_power || "—"}
                     </div>
                   </div>
-                </div> */}
 
+                </div>
                 <div className="items-center bg-gray-50 p-4 shadow-sm border border-gray-200">
                   <div className="text-sm font-bold text-teal-700 mb-1">
                     BLOCK PROPAGATION
                   </div>
                   <BlockPropagationGraph data={stats?.blockPropagation} />
                 </div>
+
+                <div className="items-center bg-gray-50 p-4 shadow-sm border border-gray-200">
+                  <div className="text-sm font-bold text-teal-700 mb-1">
+                    BLOCK TIME
+                  </div>
+                  <BarChart data={stats?.blocksWindow?.map(stat => (stat.blockTime / 1000).toFixed(2)) || [0, 0, 0]} labels={stats?.blocksWindow?.map(stat => stat.blockNumber) || [0, 0, 0]} label="Block time" color="#4C78A8" />
+                </div>
+
+                <div className="items-center bg-gray-50 p-4 shadow-sm border border-gray-200">
+                  <div className="text-sm font-bold text-teal-700 mb-1">
+                    TRANSACTIONS
+                  </div>
+                  <BarChart data={stats?.blocksWindow?.map(stat => stat.txnCount) || [0, 0, 0]} labels={stats?.blocksWindow?.map(stat => stat.blockNumber) || [0, 0, 0]} label="Transactions" color="#4C78A8" />
+                </div>
               </div>
+
+
               {/* Right side (1/3) */}
               <div className="md:col-span-2 flex flex-col bg-white p-4 shadow-sm border border-gray-200">
                 <NodeMap data={nodesLocation} />
@@ -591,8 +581,8 @@ export default function NetstatsPage() {
           <div className="sticky top-0 z-10 bg-white rounded-t-xl flex gap-2 border-b mb-4 mt-4">
             <button
               className={`px-4 py-2 font-semibold rounded-t-lg focus:outline-none transition-colors hover:cursor-pointer ${activeTab === "peers"
-                  ? "bg-blue-100 text-blue-800 border-b-2 border-blue-500"
-                  : "bg-gray-100 text-gray-600"
+                ? "bg-blue-100 text-blue-800 border-b-2 border-blue-500"
+                : "bg-gray-100 text-gray-600"
                 }`}
               onClick={() => setActiveTab("peers")}
             >
@@ -600,8 +590,8 @@ export default function NetstatsPage() {
             </button>
             <button
               className={`px-4 py-2 font-semibold rounded-t-lg focus:outline-none transition-colors hover:cursor-pointer ${activeTab === "versions"
-                  ? "bg-blue-100 text-blue-800 border-b-2 border-blue-500"
-                  : "bg-gray-100 text-gray-600"
+                ? "bg-blue-100 text-blue-800 border-b-2 border-blue-500"
+                : "bg-gray-100 text-gray-600"
                 }`}
               onClick={() => setActiveTab("versions")}
             >
@@ -609,8 +599,8 @@ export default function NetstatsPage() {
             </button>
             <button
               className={`px-4 py-2 font-semibold rounded-t-lg focus:outline-none transition-colors hover:cursor-pointer ${activeTab === "consensus"
-                  ? "bg-blue-100 text-blue-800 border-b-2 border-blue-500"
-                  : "bg-gray-100 text-gray-600"
+                ? "bg-blue-100 text-blue-800 border-b-2 border-blue-500"
+                : "bg-gray-100 text-gray-600"
                 }`}
               onClick={() => setActiveTab("consensus")}
             >
@@ -623,36 +613,112 @@ export default function NetstatsPage() {
                 {/* ✅ Static Table Headers */}
                 <thead className="bg-gray-100">
                   <tr>
-                    <th className="px-4 py-2 text-left text-nowrap">
-                      Validator Address
+                    <th
+                      onClick={() => handleSort('address')}
+                      className="cursor-pointer px-4 py-2 text-left text-nowrap"
+                    >
+                      Validator Address {sortBy === 'address' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
                     </th>
-                    <th className="px-4 py-2 text-left text-nowrap">Moniker</th>
-                    <th className="px-4 py-2 text-left text-nowrap">Node ID</th>
-                    <th className="px-4 py-2 text-left text-nowrap">
-                      Earliest Height
+
+                    <th
+                      onClick={() => handleSort('moniker')}
+                      className="cursor-pointer px-4 py-2 text-left text-nowrap"
+                    >
+                      Moniker {sortBy === 'moniker' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
                     </th>
-                    <th className="px-4 py-2 text-left text-nowrap">
-                      Latest Height
+
+                    <th
+                      onClick={() => handleSort('nodeID')}
+                      className="cursor-pointer px-4 py-2 text-left text-nowrap"
+                    >
+                      Node ID {sortBy === 'nodeID' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
                     </th>
-                    <th className="px-4 py-2 text-left text-nowrap">Hash</th>
-                    <th className="px-4 py-2 text-left text-nowrap">
-                      Block Time
+
+                    <th
+                      onClick={() => handleSort('earliestBlockHeight')}
+                      className="cursor-pointer px-4 py-2 text-left text-nowrap"
+                    >
+                      Earliest Height {sortBy === 'earliestBlockHeight' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
                     </th>
-                    <th className="px-4 py-2 text-left text-nowrap">
-                      Caught Up
+
+                    <th
+                      onClick={() => handleSort('latestBlockHeight')}
+                      className="cursor-pointer px-4 py-2 text-left text-nowrap"
+                    >
+                      Latest Height {sortBy === 'latestBlockHeight' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
                     </th>
-                    <th className="px-4 py-2 text-left text-nowrap">Network</th>
-                    <th className="px-4 py-2 text-left text-nowrap">
-                      Voting Power
+
+                    <th
+                      onClick={() => handleSort('latestAppHash')}
+                      className="cursor-pointer px-4 py-2 text-left text-nowrap"
+                    >
+                      Hash {sortBy === 'latestAppHash' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
                     </th>
-                    <th className="px-4 py-2 text-left text-nowrap">Peers</th>
-                    <th className="px-4 py-2 text-left text-nowrap">Version</th>
-                    <th className="px-4 py-2 text-left text-nowrap">OS</th>
-                    <th className="px-4 py-2 text-left text-nowrap">
-                      Go Version
+
+                    <th
+                      onClick={() => handleSort('blockTime')}
+                      className="cursor-pointer px-4 py-2 text-left text-nowrap"
+                    >
+                      Block Time {sortBy === 'blockTime' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
                     </th>
-                    <th className="px-4 py-2 text-left text-nowrap">Latency</th>
+
+                    <th
+                      onClick={() => handleSort('isSyncing')}
+                      className="cursor-pointer px-4 py-2 text-left text-nowrap"
+                    >
+                      Caught Up {sortBy === 'isSyncing' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
+                    </th>
+
+                    <th
+                      onClick={() => handleSort('network')}
+                      className="cursor-pointer px-4 py-2 text-left text-nowrap"
+                    >
+                      Network {sortBy === 'network' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
+                    </th>
+
+                    <th
+                      onClick={() => handleSort('votingPower')}
+                      className="cursor-pointer px-4 py-2 text-left text-nowrap"
+                    >
+                      Voting Power {sortBy === 'votingPower' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
+                    </th>
+
+                    <th
+                      onClick={() => handleSort('peers')}
+                      className="cursor-pointer px-4 py-2 text-left text-nowrap"
+                    >
+                      Peers {sortBy === 'peers' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
+                    </th>
+
+                    <th
+                      onClick={() => handleSort('version')}
+                      className="cursor-pointer px-4 py-2 text-left text-nowrap"
+                    >
+                      Version {sortBy === 'version' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
+                    </th>
+
+                    <th
+                      onClick={() => handleSort('os')}
+                      className="cursor-pointer px-4 py-2 text-left text-nowrap"
+                    >
+                      OS {sortBy === 'os' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
+                    </th>
+
+                    <th
+                      onClick={() => handleSort('goVersion')}
+                      className="cursor-pointer px-4 py-2 text-left text-nowrap"
+                    >
+                      Go Version {sortBy === 'goVersion' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
+                    </th>
+
+                    <th
+                      onClick={() => handleSort('latency')}
+                      className="cursor-pointer px-4 py-2 text-left text-nowrap"
+                    >
+                      Latency {sortBy === 'latency' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
+                    </th>
                   </tr>
+
                 </thead>
 
                 {/* ✅ Animated Body */}
@@ -668,7 +734,7 @@ export default function NetstatsPage() {
                     </tr>
                   )}
                   <AnimatePresence>
-                    {nodes.map((node: NodeStats, idx: number) => (
+                    {sortedNodes.map((node: NodeStats, idx: number) => (
                       <motion.tr
                         key={node.address || idx}
                         layout

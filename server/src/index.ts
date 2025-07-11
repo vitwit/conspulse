@@ -133,7 +133,7 @@ function connect(): void {
 
                 lastBlockTime = dayjs(block.header.time);
 
-                console.table(blockTimeBuckets);
+                cacheBlock(parseInt(block.header.height), new Date(block.header.time).getTime(), block.data.txs?.length || 0);
 
                 await db.insertBlock({
                     app_hash: block.header['app_hash'],
@@ -199,6 +199,7 @@ app.use(cors());
             res.status(200).json({
                 averageBlockTime: `${(averageBlockTime / 1000).toFixed(2)}s`,
                 blockPropagation: blockTimeBuckets,
+                blocksWindow: blockCache,
             })
         })
 
@@ -215,6 +216,7 @@ app.use(cors());
 
 // CRON section for cleanup
 import cron from 'node-cron';
+import { blockCache, cacheBlock } from './controllers/cache';
 
 // Schedule task to run every 10 minutes
 cron.schedule('*/10 * * * *', async () => {
