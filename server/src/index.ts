@@ -75,11 +75,12 @@ let blockIntervalCount = 0;
 let averageBlockTime: number = 0;
 
 const blockTimeBuckets: { [key: string]: number } = {
-    '0-2s': 0,
-    '2-4s': 0,
-    '4-6s': 0,
-    '6-8s': 0,
-    '8-10s': 0,
+    '0-0.5s': 0,
+    '0.5-1s': 0,
+    '1-1.5s': 0,
+    '1.5-2s': 0,
+    '2-2.5s': 0,
+    '2.5s+': 0,
 };
 
 
@@ -123,12 +124,12 @@ function connect(): void {
                     const diffMs = cbt.diff(lastBlockTime);
                     const diffSec = diffMs / 1000;
 
-                    if (diffSec <= 2) blockTimeBuckets['0-2s']++;
-                    else if (diffSec <= 4) blockTimeBuckets['2-4s']++;
-                    else if (diffSec <= 6) blockTimeBuckets['4-6s']++;
-                    else if (diffSec <= 8) blockTimeBuckets['6-8s']++;
-                    else if (diffSec <= 10) blockTimeBuckets['8-10s']++;
-                    else blockTimeBuckets['8-10s']++;
+                    if (diffSec <= 0.5) blockTimeBuckets['0-0.5s']++;
+                    else if (diffSec <= 1) blockTimeBuckets['0.5-1s']++;
+                    else if (diffSec <= 1.5) blockTimeBuckets['1-1.5s']++;
+                    else if (diffSec <= 2) blockTimeBuckets['1.5-2s']++;
+                    else if (diffSec <= 2.5) blockTimeBuckets['2-2.5s']++;
+                    else blockTimeBuckets['2.5s+']++;
                 }
 
                 lastBlockTime = dayjs(block.header.time);
@@ -163,7 +164,7 @@ function connect(): void {
     });
 
     ws.on('error', (error) => {
-        logger.error('[WebSocket] Error:', error.message);
+        logger.error(`[WebSocket] Error: ${error.message}`);
         ws?.close(); // Ensure reconnect
     });
 }
@@ -183,7 +184,7 @@ connect();
 
 // REST client
 const app = express();
-const PORT = config.PORT || 3000;
+const PORT = Number(config.PORT) || 3000;
 app.use(express.json());
 app.use(cors());
 
@@ -203,9 +204,10 @@ app.use(cors());
             })
         })
 
-        app.listen(PORT, () => {
+        app.listen(PORT, '0.0.0.0', () => {
             logger.info(`Server running at http://localhost:${PORT}`);
         });
+
     } catch (err: any) {
         logger.error(err);
         exit(1);
