@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
 import { TendermintProvider } from "./context/TendermintListener";
+import { WebSocketProvider } from "./context/WebsocketContext";
 
 
 const geistSans = Geist({
@@ -67,10 +68,12 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${sourceSans3.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${sourceSans3.variable} antialiased bg-[#0e1014]`}
       >
         <TendermintProvider >
-          {children}
+          <WebSocketProvider>
+            {children}
+          </WebSocketProvider>
         </TendermintProvider>
       </body>
     </html>

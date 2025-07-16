@@ -9,7 +9,6 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
-import { BlockPropagation } from "@/app/lib/api";
 
 // Register Chart.js components
 ChartJS.register(
@@ -24,7 +23,7 @@ ChartJS.register(
 export function BlockPropagationGraph({
   data,
 }: {
-  data: BlockPropagation | undefined;
+  data: Record<string, number> | undefined;
 }) {
   if (!data) {
     const emptyChartData = {
@@ -65,14 +64,14 @@ export function BlockPropagationGraph({
       legend: {
         display: false,
       },
-      title: {  
+      title: {
         display: false,
         text: "Block Propagation Delay Distribution (in seconds)",
       },
     },
     scales: {
       y: {
-        display: false,
+        display: true,
         beginAtZero: true,
         ticks: {
           stepSize: 100,
@@ -83,7 +82,7 @@ export function BlockPropagationGraph({
       },
       x: {
         grid: {
-          display: false
+          display: true
         }
       }
     },

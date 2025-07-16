@@ -47,3 +47,16 @@ svg circle {
   transition: none !important;
   opacity: 1 !important;
 }
+
+/* Hides scrollbar for all browsers */
+.scrollbar-hide {
+  scrollbar-width: none;
+  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE/Edge */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+  /* Chrome, Safari, Opera */
+}

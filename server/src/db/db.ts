@@ -2,6 +2,9 @@ import { createClient } from '@clickhouse/client';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import logger from './../logger/logger';
+import { clients } from '../ws';
+
+type NodeStatsMap = Map<string, NodeStats>;
 
 export interface NodeInfo {
     id: string;
@@ -70,6 +73,8 @@ type Block = {
 
 export class Database {
     private client: ReturnType<typeof createClient>;
+    private nodes: NodeInfo[];
+    private latestStats: NodeStatsMap = new Map();
 
     constructor(host: string, username: string, password: string, database?: string) {
         this.client = createClient({
@@ -78,6 +83,8 @@ export class Database {
             password: password,
             database: database,
         });
+        this.nodes = [];
+
     }
 
     async initialize(): Promise<boolean> {
@@ -120,7 +127,37 @@ export class Database {
             format: 'JSONEachRow',
         });
 
-        logger.info(`Node registered: ${node.address}`);
+        logger.debug(`Node registered: ${node.address}`);
+        this.nodes.push(node);
+
+    }
+
+    async broadcastNodes(): Promise<void> {
+        const message: any = {
+            type: "nodes",
+            nodes: this.nodes,
+        }
+        const bz = JSON.stringify(message)
+        for (const client of clients) {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(bz);
+            }
+        }
+    }
+
+    async broadcastStats(): Promise<void> {
+        const statsList = Array.from(this.latestStats.values())
+            .sort((a, b) => b.blockTime - a.blockTime);
+        const message = JSON.stringify({
+            type: "node_stats",
+            stats: statsList
+        });
+
+        for (const client of clients) {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(message);
+            }
+        }
     }
 
     async storeNodeStats(stats: NodeStats): Promise<void> {
@@ -130,6 +167,12 @@ export class Database {
                 values: [stats],
                 format: 'JSONEachRow',
             });
+
+            const key = stats.nodeID || stats.address;
+            this.latestStats.set(key, stats);
+
+            await this.broadcastStats();
+
         } catch (err) {
             console.log(err);
             throw err;
@@ -167,7 +210,7 @@ export class Database {
             },
         });
 
-        logger.info(`Node updated: ${node.address}`);
+        logger.debug(`Node updated: ${node.address}`);
     }
 
     async isNodeRegistered(address: string): Promise<boolean> {
@@ -272,7 +315,7 @@ ORDER BY blockTime DESC;
                 format: 'JSONEachRow',
             });
 
-            logger.info(`Block inserted: height=${block.height}, chain_id=${block.chain_id}`);
+            logger.debug(`Block inserted: height=${block.height}, chain_id=${block.chain_id}`);
         } catch (err) {
             logger.error(`Failed to insert block: ${err}`);
             throw err;

@@ -41,14 +41,14 @@ export default function BarChart({ data, labels, label, color = '#4C78A8',  }: B
     },
     scales: {
       x: {
-        display: false,
+        display: true,
         ticks: { autoSkip: true, maxTicksLimit: 100 },
         grid: {
             display: false
         }
       },
       y: {
-        display: false,
+        display: true,
         beginAtZero: true,
         grid: {
             display: false

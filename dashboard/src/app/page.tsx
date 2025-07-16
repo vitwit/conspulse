@@ -4,11 +4,10 @@ import { usePathname } from "next/navigation";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import { useTendermint } from "./context/TendermintListener";
+import { SupportUS } from "./components/SupportUs";
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
 const NETWORK_NAME = process.env.NEXT_PUBLIC_NETWORK_NAME || "";
-
-console.log('RPC_URL', RPC_URL);
 
 function parseHeightRoundStep(str: string) {
   const [height, round] = str.split("/");
@@ -54,6 +53,8 @@ function CopyButton({ value, className = "" }: { value: string, className?: stri
     </span>
   );
 }
+
+type AccentColor = "blue" | "green" | "yellow" | "purple";
 
 export default function Home() {
   const [consensus, setConsensus] = useState<{
@@ -120,7 +121,7 @@ export default function Home() {
         break;
       case "NewBlock":
         // fetchData();
-      break;
+        break;
     }
 
     if (height < event.height) {
@@ -221,7 +222,7 @@ export default function Home() {
       fetchData();
       return;
     }
-    timerRef.current = setTimeout(() => setTimer((t) => t - 1), 2000);
+    timerRef.current = setTimeout(() => setTimer((t) => t - 1), 5000);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
@@ -269,30 +270,12 @@ export default function Home() {
     { label: "Finalized", percent: 100 },
   ];
 
-  // Animate progressFill on block start and step changes
-  // useEffect(() => {
-  //   // On new block, flash to 100%, reset to 0, then animate to new progressPercent
-  //   if (firstLoad.current) {
-  //     setProgressFill(progressPercent);
-  //     prevProgressRef.current = progressPercent;
-  //     return;
-  //   }
-  //   if (prevHeight !== null && height !== prevHeight) {
-  //     setProgressFill(100);
-  //     setTimeout(() => {
-  //       setProgressFill(0);
-  //       prevProgressRef.current = 0;
-  //       setTimeout(() => {
-  //         setProgressFill(progressPercent);
-  //         prevProgressRef.current = progressPercent;
-  //       }, 80);
-  //     }, 100);
-  //   } else {
-  //     setProgressFill(progressPercent);
-  //     prevProgressRef.current = progressPercent;
-  //   }
-  //   // eslint-disable-next-line react-hooks/exhaustive-deps
-  // }, [height, progressPercent]);
+  const colorMap: Record<AccentColor, string> = {
+    blue: "text-blue-300",
+    green: "text-green-300",
+    yellow: "text-yellow-300",
+    purple: "text-purple-300",
+  };
 
   const fetchDumpConsensus = useCallback(async () => {
     setDumpLoading(true);
@@ -317,154 +300,191 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [fetchDumpConsensus]);
 
+  const cards: { label: string; value: string | number; accent: AccentColor }[] = [
+    { label: "Latest Height", value: height ?? "—", accent: "blue" },
+    { label: "Voting Round", value: round ?? "—", accent: "green" },
+    { label: "Pre‑votes", value: `${prevotes ?? "—"}%`, accent: "yellow" },
+    { label: "Pre‑commits", value: `${precommits ?? "—"}%`, accent: "purple" },
+    {
+      label: "Chain ID",
+      value: `${chainId ?? "—"}`,
+      accent: "blue",
+    },
+    {
+      label: "Last Block",
+      value: lastBlockTime ? timeAgo(lastBlockTime) : "—",
+      accent: "green",
+    },
+    {
+      label: "Peers",
+      value: Array.isArray(dumpConsensus?.result?.peers)
+        ? dumpConsensus.result.peers.length
+        : "—",
+      accent: "yellow",
+    }
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Top Banner */}
-      <div className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white text-center py-2 px-4 font-medium text-sm shadow-md">
-        Support us by delegating to
-        <a
-          href="https://staking.polygon.technology/validators/50"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline font-semibold ml-1 hover:text-yellow-200"
-        >
-          Vitwit validator
-        </a>
-        🚀
-      </div>
+    <div className="min-h-screen bg-[#0f1115] text-gray-200 flex flex-col overflow-x-hidden">
+      <SupportUS />
 
       {/* Navbar */}
-      <Navbar shrink={true} />
+      <Navbar shrink={false} />
 
-      <main className="flex-1 mt-4">
+      <main className="flex-1 mt-4 px-4 sm:px-8">
         {activeMenu === "consensus" && (
-          <section className="p-4 sm:p-8 max-w-5xl mx-auto bg-white rounded-xl shadow-lg">
+          <section className="p-4 sm:p-8 mx-auto bg-[#1a1e24] rounded-xl shadow-lg">
             {/* Header Section */}
             <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                <h1 className="text-2xl font-bold">Consensus State</h1>
+                <h1 className="text-2xl font-bold text-white">Consensus State</h1>
                 {NETWORK_NAME && (
-                  <span className="text-base font-medium text-blue-700 bg-blue-50 rounded px-3 py-1 ml-0 sm:ml-3 mt-1 sm:mt-0">{NETWORK_NAME}</span>
+                  <span className="text-sm font-medium text-blue-300 bg-blue-900/30 rounded px-3 py-1 ml-0 sm:ml-3 mt-1 sm:mt-0 border border-blue-600">
+                    {NETWORK_NAME}
+                  </span>
                 )}
               </div>
-              <button
-                className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700 transition min-w-[120px]"
-                onClick={fetchData}
-                disabled={loading}
-              >
-                {loading ? "Refreshing..." : `Refresh (${timer}s)`}
-              </button>
             </div>
 
             {/* Summary Section */}
-            <div className="max-w-5xl mx-auto mb-8">
-              <h2 className="text-lg font-bold mb-2 text-blue-800">
+            <div className="mx-auto mb-8">
+              <h2 className="text-lg font-bold mb-2 text-cyan-300">
                 Consensus Progress for Current Block{height ? ` (${height})` : ""}
               </h2>
               <div className="flex flex-col items-center w-full">
                 <div className="relative w-full h-5 flex items-center">
-                  <div className="absolute left-0 top-0 w-full h-3 bg-gray-200 rounded-full" />
+                  <div className="absolute left-0 top-0 w-full h-3 bg-gray-700 rounded-full" />
 
-                  <h1 style={{ zIndex: 1000000 }}>{currentStep}</h1>
+                  <h1 className="z-10 text-sm font-semibold text-white">{currentStep}</h1>
                   <div
-                    className={`absolute left-0 top-0 h-3 rounded-full transition-all duration-700 ${blockFlash ? 'ring-4 ring-blue-300' : ''}`}
-                    style={{ width: `${progressFill}%`, background: 'linear-gradient(90deg, #3B82F6 0%, #8B5CF6 100%)' }}
+                    className={`absolute left-0 top-0 h-3 rounded-full transition-all duration-700 ${blockFlash ? "ring-4 ring-blue-300" : ""
+                      }`}
+                    style={{
+                      width: `${progressFill}%`,
+                      background: "linear-gradient(90deg, #3B82F6 0%, #8B5CF6 100%)",
+                    }}
                   />
                   {/* Step markers */}
-                  {stepLabels.map((step, idx) => (
+                  {stepLabels.map((step) => (
                     <div
                       key={step.percent}
                       className="absolute top-1/3 -translate-y-1/2"
                       style={{ left: `calc(${step.percent}% - 8px)` }}
                     >
-                      <div className={`w-4 h-4 rounded-full border-2 ${progressFill >= step.percent ? 'bg-blue-500 border-blue-600' : 'bg-white border-gray-300'} flex items-center justify-center transition-all duration-700`}>
-                        {progressFill >= step.percent ? (
-                          <span className="flex items-center justify-center w-full h-full">
-                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 6.5L5.5 9L9 4" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                          </span>
-                        ) : null}
+                      <div
+                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all duration-700 ${progressFill >= step.percent
+                          ? "bg-blue-500 border-blue-600"
+                          : "bg-[#1a1e24] border-gray-600"
+                          }`}
+                      >
+                        {progressFill >= step.percent && (
+                          <svg
+                            width="12"
+                            height="12"
+                            viewBox="0 0 12 12"
+                            fill="none"
+                          >
+                            <path
+                              d="M3 6.5L5.5 9L9 4"
+                              stroke="#fff"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
-                <div className="flex w-full justify-between mt-2 text-xs text-gray-700">
-                  {stepLabels.map((step, idx) => (
-                    <span key={step.label} className={`w-1/4 text-center ${progressFill >= step.percent ? "font-bold text-blue-700" : "text-gray-400"}`}>{step.label}</span>
+                <div className="flex w-full justify-between mt-2 text-xs text-gray-400">
+                  {stepLabels.map((step) => (
+                    <span
+                      key={step.label}
+                      className={`w-1/4 text-center ${progressFill >= step.percent
+                        ? "font-semibold text-white"
+                        : "text-gray-500"
+                        }`}
+                    >
+                      {step.label}
+                    </span>
                   ))}
                 </div>
               </div>
             </div>
 
             <div className="relative mb-8">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="flex flex-col items-center bg-blue-100 rounded-lg p-4 shadow-inner">
-                  <span className="text-gray-600" title="The latest block height observed by the node.">Latest Height</span>
-                  <span className="text-xl font-bold text-blue-900">{height}</span>
-                </div>
-                <div className="flex flex-col items-center bg-green-100 rounded-lg p-4 shadow-inner">
-                  <span className="text-gray-600" title="The current voting round for the latest block.">Voting Round</span>
-                  <span className="text-xl font-bold text-green-900">{round}</span>
-                </div>
-                <div className="flex flex-col items-center bg-yellow-100 rounded-lg p-4 shadow-inner">
-                  <span className="text-gray-600" title="Percentage of validators that have prevoted in this round.">Pre-votes</span>
-                  <span className="text-xl font-bold text-yellow-900">{prevotes}%</span>
-                </div>
-                <div className="flex flex-col items-center bg-purple-100 rounded-lg p-4 shadow-inner">
-                  <span className="text-gray-600" title="Percentage of validators that have precommitted in this round.">Pre-commits</span>
-                  <span className="text-xl font-bold text-purple-900">{precommits}%</span>
-                </div>
-                <div className="flex flex-col items-center bg-gray-100 rounded-lg p-4 shadow-inner">
-                  <span className="text-gray-600" title="The unique identifier of the blockchain network.">Chain ID</span>
-                  <span className="text-base font-bold text-gray-900 flex items-center gap-1">
-                    {chainId || "—"}
-                    {chainId && <CopyButton value={chainId} />}
-                  </span>
-                </div>
-                <div className="flex flex-col items-center bg-gray-100 rounded-lg p-4 shadow-inner">
-                  <span className="text-gray-600" title="How long ago the last block was committed.">Last Block</span>
-                  <span className="text-base font-bold text-gray-900">{blockStartTime ? timeAgo(blockStartTime) : "—"}</span>
-                </div>
-                <div className="flex flex-col items-center bg-pink-100 rounded-lg p-4 shadow-inner">
-                  <span className="text-gray-600" title="Number of peers connected to this node.">Peers</span>
-                  <span className="text-xl font-bold text-pink-900">{Array.isArray(dumpConsensus?.result?.peers) ? dumpConsensus.result.peers.length : '—'}</span>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-                <div className="flex flex-col items-center bg-gray-100 rounded-lg p-4 shadow-inner col-span-3 md:col-span-3 w-full">
-                  <span className="text-gray-600" title="The address of the validator who proposed the current block.">Proposer</span>
-                  <span className="text-base font-bold text-gray-900 break-all flex items-center gap-1">
-                    {proposer || "—"}
-                    {proposer && <CopyButton value={proposer} />}
-                  </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 text-white font-sans">
+                {cards.map(({ label, value, accent }) => (
+                  <div
+                    key={label}
+                    className="bg-[#1a1e24] rounded-lg px-5 py-4 border border-[#2a2f3a] hover:border-cyan-400 transition shadow-sm"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-medium text-teal-400">{label}</h3>
+                    </div>
+                    <div
+                      className={`text-2xl font-mono font-bold leading-tight truncate ${colorMap[accent]}`}
+                      title={value.toString()}
+                    >
+                      {value}
+                    </div>
+                  </div>
+                ))}
+                <div
+                  key="proposer"
+                  className="bg-[#1a1e24] col-span-2 rounded-lg px-5 py-4 border border-[#2a2f3a] hover:border-cyan-400 transition shadow-sm"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium text-teal-400">Proposer</h3>
+                  </div>
+                  <div
+                    className={`text-2xl font-mono font-bold leading-tight truncate text-purple-300`}
+                    title="Proposer"
+                  >
+                    {proposer ? proposer : "-"}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Proposer Info Section (from dumpConsensus) */}
+            </div>
+            {/* Proposer Info Section */}
+
             {(() => {
               const proposerAddr = dumpConsensus?.result?.round_state?.proposer?.address;
               const proposerObj = dumpConsensus?.result?.round_state?.validators?.validators?.find?.((v: any) => v.address === proposerAddr);
               const blockProposerAddr = dumpConsensus?.result?.round_state?.proposal_block?.header?.proposer_address;
+
               return proposerAddr ? (
-                <div className="bg-blue-50 rounded-lg p-4 shadow-inner mb-8">
-                  <h3 className="text-lg font-semibold mb-2 text-blue-800">Current Proposer Info</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="bg-[#1a1e24] rounded-lg p-4 shadow-inner mb-8 border border-gray-700">
+                  <h3 className="text-lg font-semibold mb-4 text-cyan-300">Current Proposer Info</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-300">
                     <div>
                       <span className="text-gray-500">Proposer Address</span>
-                      <div className="font-mono flex items-center gap-1">{proposerAddr}<CopyButton value={proposerAddr} /></div>
+                      <div className="font-mono flex items-center gap-1 text-gray-100">
+                        {proposerAddr}
+                        <CopyButton value={proposerAddr} />
+                      </div>
                     </div>
                     <div>
                       <span className="text-gray-500">Voting Power</span>
-                      <div className="font-mono">{proposerObj?.voting_power || '—'}</div>
+                      <div className="font-mono text-gray-100">
+                        {proposerObj?.voting_power ?? '—'}
+                      </div>
                     </div>
                     <div>
                       <span className="text-gray-500">Proposer Priority</span>
-                      <div className="font-mono">{proposerObj?.proposer_priority || '—'}</div>
+                      <div className="font-mono text-gray-100">
+                        {proposerObj?.proposer_priority ?? '—'}
+                      </div>
                     </div>
                     {blockProposerAddr && (
                       <div>
                         <span className="text-gray-500">Block Proposer Address</span>
-                        <div className="font-mono flex items-center gap-1">{blockProposerAddr}<CopyButton value={blockProposerAddr} /></div>
+                        <div className="font-mono flex items-center gap-1 text-gray-100">
+                          {blockProposerAddr}
+                          <CopyButton value={blockProposerAddr} />
+                        </div>
                       </div>
                     )}
                   </div>
@@ -472,41 +492,41 @@ export default function Home() {
               ) : null;
             })()}
 
+
+            {/* ... same dark theme update applied */}
+
             {/* Validators Table Section */}
             <div className="relative">
-              <div className="mb-2 flex justify-between items-center">
-                <h2 className="text-xl font-bold">Validators State</h2>
+              <div className="mb-4 flex justify-between items-center">
+                <h2 className="text-xl font-bold text-cyan-300">Validators State</h2>
                 <button
-                  className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm font-medium"
+                  className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-sm font-medium text-white rounded"
                   onClick={() => setSortByPower((s) => (s === "desc" ? "asc" : "desc"))}
                 >
                   Sort by Voting Power: {sortByPower === "desc" ? "High → Low" : "Low → High"}
                 </button>
               </div>
-              <div className="relative">
-                <table className="w-full bg-white rounded-lg shadow overflow-hidden">
-                  <thead className="bg-gray-100">
+
+              <div className="relative overflow-x-auto border border-gray-700 rounded-lg">
+                <table className="w-full bg-[#1a1e24] rounded-lg overflow-hidden">
+                  <thead className="bg-gray-800 text-gray-400 text-xs uppercase">
                     <tr>
-                      <th className="px-4 py-2 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold" title="Mark as favourite for quick access">Favourite</th>
-                      <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold" title="Validator operator address">Validator Address</th>
-                      <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold cursor-pointer select-none" title="Sort by voting power (%)" onClick={() => setSortByPower((s) => (s === "desc" ? "asc" : "desc"))}>
+                      <th className="px-4 py-2 text-left" title="Mark as favourite for quick access">Favourite</th>
+                      <th className="px-4 py-2 text-left" title="Validator operator address">Validator Address</th>
+                      <th className="px-4 py-2 text-left cursor-pointer" title="Sort by voting power (%)" onClick={() => setSortByPower((s) => (s === "desc" ? "asc" : "desc"))}>
                         <span className="inline-flex items-center gap-1">
                           Voting Power
                           {sortByPower === "desc" ? (
-                            <span title="Sort by Voting Power">
-                              <svg className="inline w-4 h-4 ml-1" viewBox="0 0 16 16" fill="none"><path d="M8 11L3 6h10L8 11z" fill="#2563eb" /></svg>
-                            </span>
+                            <svg className="inline w-4 h-4 ml-1" viewBox="0 0 16 16" fill="none"><path d="M8 11L3 6h10L8 11z" fill="#38bdf8" /></svg>
                           ) : (
-                            <span title="Sort by Voting Power">
-                              <svg className="inline w-4 h-4 ml-1" viewBox="0 0 16 16" fill="none"><path d="M8 5l5 5H3l5-5z" fill="#2563eb" /></svg>
-                            </span>
+                            <svg className="inline w-4 h-4 ml-1" viewBox="0 0 16 16" fill="none"><path d="M8 5l5 5H3l5-5z" fill="#38bdf8" /></svg>
                           )}
                         </span>
                       </th>
-                      <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold" title="Cumulative voting power up to this validator">Cumulative Voting Power</th>
-                      <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold" title="Did this validator prevote in the current round?">Voted</th>
-                      <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold" title="Did this validator precommit in the current round?">Precommit</th>
-                      <th className="py-2 px-4 bg-gray-50 text-left text-xs text-gray-500 uppercase font-bold" title="The latest round number for this block">Latest Round</th>
+                      <th className="px-4 py-2 text-left" title="Cumulative voting power up to this validator">Cumulative Voting Power</th>
+                      <th className="px-4 py-2 text-left" title="Did this validator prevote in the current round?">Voted</th>
+                      <th className="px-4 py-2 text-left" title="Did this validator precommit in the current round?">Precommit</th>
+                      <th className="px-4 py-2 text-left" title="The latest round number for this block">Latest Round</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -515,46 +535,38 @@ export default function Home() {
                       const votingPowerPercent = totalVotingPower ? ((votingPower / totalVotingPower) * 100).toFixed(2) : "0.00";
                       cumulative += votingPower;
                       const cumulativePercent = totalVotingPower ? ((cumulative / totalVotingPower) * 100).toFixed(2) : "0.00";
-                      // Determine voted status by index in prevotes array
+
                       let voted = false;
-                      const latestVoteSet = consensus?.height_vote_set?.[0];
-                      if (latestVoteSet && Array.isArray(latestVoteSet.prevotes)) {
-                        const vote = latestVoteSet.prevotes[idx];
-                        voted = typeof vote === 'string' && !vote.startsWith('nil');
-                      }
-                      // Determine precommit status by index in precommits array
                       let precommitted = false;
-                      if (latestVoteSet && Array.isArray(latestVoteSet.precommits)) {
-                        const precommit = latestVoteSet.precommits[idx];
-                        precommitted = typeof precommit === 'string' && !precommit.startsWith('nil');
+                      const latestVoteSet = consensus?.height_vote_set?.[0];
+                      if (latestVoteSet) {
+                        voted = typeof latestVoteSet.prevotes?.[idx] === 'string' && !latestVoteSet.prevotes[idx].startsWith('nil');
+                        precommitted = typeof latestVoteSet.precommits?.[idx] === 'string' && !latestVoteSet.precommits[idx].startsWith('nil');
                       }
+
                       const rowColor = favourites.includes(v.address)
-                        ? "bg-yellow-100"
+                        ? "bg-cyan-900"
                         : voted
-                          ? "bg-green-50"
-                          : "bg-red-50";
+                          ? "bg-green-900"
+                          : "bg-grey-900";
+
                       return (
-                        <tr key={v.address} className={rowColor}>
-                          <td className="py-2 px-4 text-center font-sans text-sm">
+                        <tr key={v.address} className={`${rowColor} text-gray-100`}>
+                          <td className="px-4 py-2 text-center">
                             <button
                               aria-label={favourites.includes(v.address) ? "Unfavourite" : "Favourite"}
                               onClick={() => toggleFavourite(v.address)}
-                              className="text-xl focus:outline-none"
+                              className="text-xl text-yellow-400 focus:outline-none"
                             >
                               {favourites.includes(v.address) ? "★" : "☆"}
                             </button>
                           </td>
-                          <td className="py-2 px-4 font-sans text-sm">
-                            <span className="flex items-center gap-1">
-                              {v.address}
-                              <CopyButton value={v.address} />
-                            </span>
-                          </td>
-                          <td className="py-2 px-4 font-sans text-sm">{votingPowerPercent}%</td>
-                          <td className="py-2 px-4 font-sans text-sm">{cumulativePercent}%</td>
-                          <td className="py-2 px-4 text-center font-sans text-sm">{voted ? "✅" : "❌"}</td>
-                          <td className="py-2 px-4 text-center font-sans text-sm">{precommitted ? "✅" : "❌"}</td>
-                          <td className="py-2 px-4 text-center font-sans text-sm">{round}</td>
+                          <td className="px-4 py-2 font-mono text-sm flex items-center gap-1">{v.address}<CopyButton value={v.address} /></td>
+                          <td className="px-4 py-2">{votingPowerPercent}%</td>
+                          <td className="px-4 py-2">{cumulativePercent}%</td>
+                          <td className="px-4 py-2 text-center">{voted ? "✅" : "❌"}</td>
+                          <td className="px-4 py-2 text-center">{precommitted ? "✅" : "❌"}</td>
+                          <td className="px-4 py-2 text-center">{round}</td>
                         </tr>
                       );
                     })}
@@ -563,18 +575,19 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Votes by Round Section (from dumpConsensus) - moved to bottom */}
+            {/* Votes by Round Section */}
             {dumpLoading ? (
-              <div>Loading votes by round...</div>
+              <div className="text-gray-400 mt-6">Loading votes by round...</div>
             ) : dumpError ? (
-              <div className="text-red-400">Error loading votes: {dumpError}</div>
-            ) : Array.isArray(dumpConsensus?.result?.round_state?.votes) && dumpConsensus.result.round_state.votes.length > 0 && (
-              <div className="bg-gray-50 rounded-lg p-4 shadow-inner mt-8">
-                <h3 className="text-lg font-semibold mb-2 text-blue-800">Votes by Round</h3>
+              <div className="text-red-400 mt-6">Error loading votes: {dumpError}</div>
+            ) : Array.isArray(dumpConsensus?.result?.round_state?.votes) &&
+            dumpConsensus.result.round_state.votes.length > 0 && (
+              <div className="bg-[#1a1e24] border border-gray-700 rounded-lg p-4 shadow-inner mt-8">
+                <h3 className="text-lg font-semibold mb-2 text-cyan-300">Votes by Round</h3>
                 <div className="overflow-x-auto">
-                  <table className="min-w-full text-xs">
+                  <table className="min-w-full text-xs text-gray-200">
                     <thead>
-                      <tr className="bg-gray-100">
+                      <tr className="bg-gray-800 text-gray-400">
                         <th className="px-2 py-1 text-left">Round</th>
                         <th className="px-2 py-1 text-left">Prevotes Bit Array</th>
                         <th className="px-2 py-1 text-left">Precommits Bit Array</th>
@@ -582,7 +595,7 @@ export default function Home() {
                     </thead>
                     <tbody>
                       {dumpConsensus.result.round_state.votes.map((vote: any, idx: number) => (
-                        <tr key={idx} className="border-b last:border-b-0">
+                        <tr key={idx} className="border-b border-gray-700 last:border-b-0">
                           <td className="px-2 py-1 font-mono">{vote.round ?? idx}</td>
                           <td className="px-2 py-1 font-mono break-all">{vote.prevotes_bit_array || '—'}</td>
                           <td className="px-2 py-1 font-mono break-all">{vote.precommits_bit_array || '—'}</td>
@@ -593,12 +606,15 @@ export default function Home() {
                 </div>
               </div>
             )}
+
+
           </section>
         )}
       </main>
 
       {/* Footer */}
       <Footer />
-    </div>
+    </div >
+
   );
 }

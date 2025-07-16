@@ -1,6 +1,5 @@
 'use client';
 
-// src/context/TendermintContext.tsx
 import React, {
   createContext,
   useContext,
@@ -8,8 +7,6 @@ import React, {
   useRef,
   useState,
 } from "react";
-
-type VoteType = "Prevote" | "Precommit";
 
 export type ConsensusEvent =
   | { type: "NewRound"; height: number; round: number; step?: string; }
@@ -31,7 +28,7 @@ export const TendermintProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const socket = new WebSocket(`${process.env.NEXT_PUBLIC_WEBSOCKET}/websocket`);
+    const socket = new WebSocket(`${process.env.NEXT_PUBLIC_RPC_WEBSOCKET}/websocket`);
     socketRef.current = socket;
 
     const subscriptions = [
