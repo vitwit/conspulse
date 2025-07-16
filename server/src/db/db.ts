@@ -3,6 +3,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import logger from './../logger/logger';
 import { clients } from '../ws';
+import { WebSocket } from 'ws';
 
 type NodeStatsMap = Map<string, NodeStats>;
 
