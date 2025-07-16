@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-import { timeAgo } from './../utils';
+import { timeAgo, timeDifference } from '../../utils';
 
 interface Validator {
     address: string;
@@ -17,6 +17,7 @@ interface Props {
     lastCommitVotes: string[];
     lastCommitBitArray: string | null;
     totalVotingPower: number;
+    roundStartTime: Date;
 }
 
 const LastBlockConsensusTab: React.FC<Props> = ({
@@ -24,6 +25,7 @@ const LastBlockConsensusTab: React.FC<Props> = ({
     lastCommitVotes,
     lastCommitBitArray,
     totalVotingPower,
+    roundStartTime
 }) => {
     const now = Date.now();
 
@@ -64,7 +66,7 @@ const LastBlockConsensusTab: React.FC<Props> = ({
                                     <td className="px-4 py-2 font-mono text-gray-200">{idx}</td>
                                     <td className="px-4 py-2 font-mono text-gray-200 break-all">{v.address}</td>
                                     <td className="px-4 py-2 font-mono">{voted ? '✅' : '❌'}</td>
-                                    <td className="px-4 py-2 font-mono">{voteTime ? timeAgo(voteTime, now) : '—'}</td>
+                                    <td className="px-4 py-2 font-mono">{voteTime ? timeDifference(new Date(), voteTime) : '—'}</td>
                                     <td className="px-4 py-2 font-mono">{votingPower}</td>
                                     <td className="px-4 py-2 font-mono">{votingPowerPercent}%</td>
                                     <td className="px-4 py-2 font-mono break-all">{vote || '—'}</td>

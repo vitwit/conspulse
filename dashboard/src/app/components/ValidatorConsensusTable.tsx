@@ -1,5 +1,5 @@
 import React from "react";
-import { timeAgo } from "./../heartbeat/utils";
+import { timeAgo } from "../utils";
 import CopyButton from "./CopyButton";
 
 function parseVoteTime(vote: string) {

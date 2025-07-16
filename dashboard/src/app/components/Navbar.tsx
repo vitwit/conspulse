@@ -4,8 +4,8 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 
 export const NAV_ITEMS = [
-  { label: "Consensus", key: "consensus", href: "/" },
-  { label: "Heart Beat", key: "heartbeat", href: "/heartbeat" },
+  { label: "Heartbeat", key: "heartbeat", href: "/" },
+  { label: "Consensus", key: "consensus", href: "/consensus" },
   { label: "Debug Consensus", key: "debug-consensus", href: "/debug-consensus" },
 ];
 

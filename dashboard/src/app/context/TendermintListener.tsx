@@ -24,10 +24,11 @@ export const TendermintProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const socketRef = useRef<WebSocket | null>(null);
   const [event, setEvent] = useState<ConsensusEvent | null>(null);
+  const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
+  const retryCountRef = useRef<number>(0);
+  const MAX_RETRIES = 10;
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
+  const connectWebSocket = () => {
     const socket = new WebSocket(`${process.env.NEXT_PUBLIC_RPC_WEBSOCKET}/websocket`);
     socketRef.current = socket;
 
@@ -40,6 +41,8 @@ export const TendermintProvider: React.FC<{ children: React.ReactNode }> = ({
     ];
 
     socket.onopen = () => {
+      retryCountRef.current = 0; // Reset retry count on success
+
       subscriptions.forEach(({ query, id }) => {
         socket.send(
           JSON.stringify({
@@ -56,9 +59,10 @@ export const TendermintProvider: React.FC<{ children: React.ReactNode }> = ({
       try {
         const data = JSON.parse(e.data);
         const type = data?.result?.data?.type;
+        const value = data?.result?.data?.value;
+
         switch (type) {
           case "tendermint/event/NewRound": {
-            const value = data.result.data.value;
             setEvent({
               type: "NewRound",
               height: parseInt(value.height, 10),
@@ -68,7 +72,7 @@ export const TendermintProvider: React.FC<{ children: React.ReactNode }> = ({
           }
 
           case "tendermint/event/Vote": {
-            const vote = data.result.data.value['Vote'];
+            const vote = value['Vote'];
             setEvent({
               type: "Vote",
               height: parseInt(vote.height, 10),
@@ -81,11 +85,11 @@ export const TendermintProvider: React.FC<{ children: React.ReactNode }> = ({
             setEvent({
               height: 0,
               round: 0,
-              type: "NewBlock"
-            })
+              type: "NewBlock",
+            });
             break;
+
           case "tendermint/event/CompleteProposal": {
-            const value = data.result.data.value;
             setEvent({
               type: "CompleteProposal",
               height: parseInt(value.height, 10),
@@ -95,30 +99,28 @@ export const TendermintProvider: React.FC<{ children: React.ReactNode }> = ({
           }
 
           case "tendermint/event/RoundState": {
-            const value = data.result.data.value;
-
-            let stepName = ""
+            let stepName = "";
             switch (value.step) {
               case "RoundStepNewHeight":
-                stepName = "NewHeight"
+                stepName = "NewHeight";
                 break;
               case "RoundStepPrecommit":
-                stepName = "Precommit"
+                stepName = "Precommit";
                 break;
               case "RoundStepPrevote":
-                stepName = "Prevote"
+                stepName = "Prevote";
                 break;
               case "RoundStepCommit":
-                stepName = "Commit"
+                stepName = "Commit";
                 break;
               case "RoundStepPropose":
-                stepName = "Propose"
+                stepName = "Propose";
                 break;
               default:
-                stepName = ""
+                stepName = "";
             }
 
-            if (stepName == "") { break }
+            if (stepName === "") break;
 
             setEvent({
               type: "Step",
@@ -139,11 +141,38 @@ export const TendermintProvider: React.FC<{ children: React.ReactNode }> = ({
     };
 
     socket.onclose = () => {
-      console.warn("WebSocket closed");
+      console.warn("WebSocket closed. Attempting to reconnect...");
+      reconnect();
     };
+  };
+
+  const reconnect = (delay = 3000) => {
+    if (retryCountRef.current >= MAX_RETRIES) {
+      console.error("Max retries reached. WebSocket will not reconnect.");
+      return;
+    }
+
+    if (reconnectTimeout.current) return; // Prevent duplicate timeouts
+
+    reconnectTimeout.current = setTimeout(() => {
+      reconnectTimeout.current = null;
+      retryCountRef.current += 1;
+      console.log(`Reconnecting... attempt ${retryCountRef.current}`);
+      connectWebSocket();
+    }, delay);
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    connectWebSocket();
 
     return () => {
       socketRef.current?.close();
+      if (reconnectTimeout.current) {
+        clearTimeout(reconnectTimeout.current);
+        reconnectTimeout.current = null;
+      }
     };
   }, []);
 

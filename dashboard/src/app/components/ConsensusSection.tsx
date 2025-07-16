@@ -1,8 +1,6 @@
 import React from "react";
 import CopyButton from "./CopyButton";
 import VotesByRoundTable from "./VotesByRoundTable";
-import ValidatorsConsensusTable from "./ValidatorConsensusTable";
-import { timeAgo } from "./../heartbeat/utils";
 
 interface ConsensusSectionProps {
     height: number | null;

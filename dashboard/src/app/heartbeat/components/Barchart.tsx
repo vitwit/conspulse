@@ -19,9 +19,10 @@ type BarChartProps = {
   labels: (string | number)[];
   label: string;
   color?: string;
+  showIntegersOnly?: boolean;
 };
 
-export default function BarChart({ data, labels, label, color = '#4C78A8',  }: BarChartProps) {
+export default function BarChart({ data, labels, label, color = '#4C78A8', showIntegersOnly = false }: BarChartProps) {
   const chartData: ChartData<'bar'> = {
     labels,
     datasets: [
@@ -44,15 +45,23 @@ export default function BarChart({ data, labels, label, color = '#4C78A8',  }: B
         display: true,
         ticks: { autoSkip: true, maxTicksLimit: 100 },
         grid: {
-            display: false
+          display: false
         }
       },
       y: {
         display: true,
         beginAtZero: true,
         grid: {
-            display: false
-        }
+          display: false
+        },
+        ticks: showIntegersOnly
+          ? {
+            callback: function (value) {
+              return Number.isInteger(value as number) ? value : '';
+            },
+            stepSize: 1,
+          }
+          : {},
       },
     },
   };
