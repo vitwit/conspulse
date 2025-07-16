@@ -52,6 +52,7 @@ export default function DebugConsensusPage() {
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
+      console.log(data);
       setOutput(data);
     } catch (err: any) {
       setError(err.message || "Unknown error");
@@ -158,6 +159,159 @@ export default function DebugConsensusPage() {
           </form>
 
           {error && <div className="bg-red-800 text-red-100 p-3 rounded mt-4">{error}</div>}
+
+          {output && (
+            <div className="mt-8">
+              <h2 className="text-2xl font-bold mb-6 text-blue-400">Comparison Output</h2>
+
+              {/* Summary Boxes */}
+              <div className="mb-4 grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+                <div className="bg-[#1f2a36] text-blue-400 border border-blue-700 rounded p-2 flex flex-col items-center">
+                  <span className="text-xs text-gray-400">Total Stores</span>
+                  <span className="font-bold">{output.summary?.total_stores}</span>
+                </div>
+                <div className="bg-[#1d2a1f] text-green-400 border border-green-700 rounded p-2 flex flex-col items-center">
+                  <span className="text-xs text-gray-400">Matching</span>
+                  <span className="font-bold">{output.summary?.matching_stores}</span>
+                </div>
+                <div className="bg-[#2a1e1e] text-red-400 border border-red-700 rounded p-2 flex flex-col items-center">
+                  <span className="text-xs text-gray-400">Differing</span>
+                  <span className="font-bold">{output.summary?.differing_stores}</span>
+                </div>
+                <div className="bg-[#2a2f3a] text-gray-400 border border-gray-600 rounded p-2 flex flex-col items-center">
+                  <span className="text-xs text-gray-400">Missing</span>
+                  <span className="font-bold">{output.summary?.missing_stores}</span>
+                </div>
+              </div>
+
+              {/* Table */}
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm border border-[#3a3f4a] rounded overflow-hidden">
+                  <thead>
+                    <tr className="bg-[#2a2f3a] text-gray-200">
+                      <th className="px-3 py-2 text-left font-bold">Store</th>
+                      <th className="px-3 py-2 text-left font-bold">Status</th>
+                      <th className="px-3 py-2 text-left font-bold">Hash 1</th>
+                      <th className="px-3 py-2 text-left font-bold">Hash 2</th>
+                      <th className="px-3 py-2 text-left font-bold">Type 1</th>
+                      <th className="px-3 py-2 text-left font-bold">Type 2</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Define types and maps */}
+                    {(() => {
+                      type StoreStatus = 'match' | 'differ' | 'missing_source1' | 'missing_source2';
+
+                      const statusOrder: Record<StoreStatus, number> = {
+                        differ: 0,
+                        missing_source1: 0,
+                        missing_source2: 0,
+                        match: 1,
+                      };
+
+                      const statusLabelMap: Record<StoreStatus, string> = {
+                        match: 'Match',
+                        differ: 'Differ',
+                        missing_source1: 'Missing in Source 1',
+                        missing_source2: 'Missing in Source 2',
+                      };
+
+                      return [...output.results]
+                        .sort((a, b) => {
+                          const aOrder = statusOrder[a.status as StoreStatus] ?? 2;
+                          const bOrder = statusOrder[b.status as StoreStatus] ?? 2;
+                          return aOrder - bOrder;
+                        })
+                        .map((res) => {
+                          const status = res.status as StoreStatus;
+                          let rowClass = '';
+                          if (status === 'match') rowClass = 'bg-[#1a2a1a]';
+                          else if (status === 'differ') rowClass = 'bg-[#2a1a1a]';
+                          else rowClass = 'bg-[#1a1e24]';
+
+                          return (
+                            <React.Fragment key={res.name}>
+                              <tr className={`${rowClass} border-b border-[#2a2f3a]`}>
+                                <td className="px-3 py-2 font-mono font-semibold">{res.name}</td>
+                                <td className="px-3 py-2 font-bold">
+                                  <span
+                                    className={
+                                      status === 'match'
+                                        ? 'text-green-400'
+                                        : status === 'differ'
+                                          ? 'text-red-400'
+                                          : 'text-gray-400'
+                                    }
+                                  >
+                                    {statusLabelMap[status] || status}
+                                  </span>
+                                  {res.extra && (
+                                    <button
+                                      type="button"
+                                      className="ml-2 text-xs text-blue-400 underline hover:text-blue-300 focus:outline-none"
+                                      onClick={() =>
+                                        setExpandedRows((prev) => ({
+                                          ...prev,
+                                          [res.name]: !prev[res.name],
+                                        }))
+                                      }
+                                    >
+                                      {expandedRows[res.name] ? 'Hide Details' : 'Show Details'}
+                                    </button>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 font-mono break-all text-xs text-gray-300">
+                                  {res.hash1 || <span className="text-gray-500">—</span>}
+                                </td>
+                                <td className="px-3 py-2 font-mono break-all text-xs text-gray-300">
+                                  {res.hash2 || <span className="text-gray-500">—</span>}
+                                </td>
+                                <td className="px-3 py-2 font-mono text-xs text-gray-300">
+                                  {res.store_type1 || <span className="text-gray-500">—</span>}
+                                </td>
+                                <td className="px-3 py-2 font-mono text-xs text-gray-300">
+                                  {res.store_type2 || <span className="text-gray-500">—</span>}
+                                </td>
+                              </tr>
+                              {res.extra && expandedRows[res.name] && (
+                                <tr className="bg-[#1e222a]">
+                                  <td colSpan={6} className="px-4 py-3 border-t border-[#3a3f4a]">
+                                    <pre className="whitespace-pre-wrap text-xs font-mono bg-[#0e1014] text-gray-300 rounded p-3 overflow-x-auto border border-blue-900">
+                                      {res.extra}
+                                    </pre>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        });
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Metadata */}
+              <div className="mt-6 text-xs text-gray-400 border-t border-[#2a2f3a] pt-4">
+                <div>
+                  Source1 Version:{' '}
+                  <span className="font-mono text-white">{output.metadata?.source1_version}</span>
+                </div>
+                <div>
+                  Source2 Version:{' '}
+                  <span className="font-mono text-white">{output.metadata?.source2_version}</span>
+                </div>
+                <div>
+                  Comparison Time:{' '}
+                  <span className="font-mono text-white">{output.metadata?.comparison_time}</span>
+                </div>
+                <div>
+                  Processing Time:{' '}
+                  <span className="font-mono text-white">{output.metadata?.processing_time}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
         </section>
       </main>
 
