@@ -9,11 +9,11 @@ import React, {
 } from "react";
 
 export type ConsensusEvent =
-  | { type: "NewRound"; height: number; round: number; step?: string; }
-  | { type: "Vote"; height: number; round: number; step?: string; }
-  | { type: "CompleteProposal"; height: number; round: number; step?: string }
-  | { type: "Step"; step: string; height: number; round: number }
-  | { type: "NewBlock"; step?: string; height: number; round: number };
+  | { type: "NewRound"; height: number; round: number; step?: string; stepValue?: number; proposer?: string }
+  | { type: "Vote"; height: number; round: number; step?: string; stepValue?: number; proposer?: string }
+  | { type: "CompleteProposal"; height: number; round: number; step?: string; stepValue?: number; proposer?: string }
+  | { type: "Step"; step: string; height: number; round: number, stepValue: number; proposer?: string }
+  | { type: "NewBlock"; step?: string; height: number; round: number; stepValue?: number; proposer?: string };
 
 const TendermintContext = createContext<ConsensusEvent | null>(null);
 
@@ -61,6 +61,7 @@ export const TendermintProvider: React.FC<{ children: React.ReactNode }> = ({
         const type = data?.result?.data?.type;
         const value = data?.result?.data?.value;
 
+        let step: number = 0;
         switch (type) {
           case "tendermint/event/NewRound": {
             setEvent({
@@ -83,7 +84,8 @@ export const TendermintProvider: React.FC<{ children: React.ReactNode }> = ({
 
           case "tendermint/event/NewBlock":
             setEvent({
-              height: 0,
+              height: data?.result?.data?.value?.block?.header?.height,
+              proposer: data?.result?.data?.value?.block?.header?.proposer_address,
               round: 0,
               type: "NewBlock",
             });
@@ -106,15 +108,19 @@ export const TendermintProvider: React.FC<{ children: React.ReactNode }> = ({
                 break;
               case "RoundStepPrecommit":
                 stepName = "Precommit";
+                step = 2;
                 break;
               case "RoundStepPrevote":
                 stepName = "Prevote";
+                step = 1;
                 break;
               case "RoundStepCommit":
                 stepName = "Commit";
+                step = 3;
                 break;
               case "RoundStepPropose":
                 stepName = "Propose";
+                step = 0;
                 break;
               default:
                 stepName = "";
@@ -125,6 +131,7 @@ export const TendermintProvider: React.FC<{ children: React.ReactNode }> = ({
             setEvent({
               type: "Step",
               step: stepName,
+              stepValue: step,
               height: parseInt(value.height, 10),
               round: parseInt(value.round, 10),
             });

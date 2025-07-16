@@ -30,6 +30,7 @@ import { NetworkMessage, Stats } from "./types/ws";
 import { SupportUS } from "./components/SupportUs";
 import LastBlockConsensusTab from "./heartbeat/components/LastBlockConsensus";
 import PeersTableTab from "./heartbeat/components/PeersTableTab";
+import { useTendermint } from "./context/TendermintListener";
 
 const rowVariants = {
   initial: { opacity: 0, y: -20 },
@@ -49,8 +50,6 @@ const NET_INFO_URL = `${RPC_URL}/net_info`;
 export default function NetstatsPage() {
   const [dump, setDump] = useState<any>(null);
   const [netInfo, setNetInfo] = useState<any>(null);
-  const [loadingDump, setLoadingDump] = useState(true);
-  const [loadingNet, setLoadingNet] = useState(true);
   const [errorDump, setErrorDump] = useState<string | null>(null);
   const [errorNet, setErrorNet] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
@@ -65,6 +64,29 @@ export default function NetstatsPage() {
 
   const { networkStats, nodesStats, retries, error } = useWebSocket();
 
+  const [height, setHeight] = useState<string>("");
+  const [step, setStep] = useState<number>(0);
+  const [round, setRound] = useState<number>(0);
+  const [proposer, setProposer] = useState<string>("");
+  const event = useTendermint();
+
+  useEffect(() => {
+    if (!event) return;
+    if (event.height) {
+      const heightNum = Number(event.height);
+      if (!isNaN(heightNum)) {
+        setHeight(heightNum.toLocaleString());
+      } else {
+        setHeight(String(event.height));
+      }
+    }
+    if (event.round)
+      setRound(event.round);
+    if (event.stepValue)
+      setStep(event.stepValue);
+    if (event.proposer)
+      setProposer(event.proposer);
+  }, [event]);
 
   const handleSort = (key: string) => {
     if (sortBy === key) {
@@ -96,7 +118,6 @@ export default function NetstatsPage() {
 
 
   const fetchDump = useCallback(async () => {
-    setLoadingDump(true);
     setErrorDump(null);
     try {
       const res = await fetch(DUMP_CONSENSUS_URL);
@@ -106,13 +127,10 @@ export default function NetstatsPage() {
     } catch (err: any) {
       setErrorDump(err.message || "Unknown error");
       setDump(null);
-    } finally {
-      setLoadingDump(false);
     }
   }, []);
 
   const fetchNetInfo = useCallback(async () => {
-    setLoadingNet(true);
     setErrorNet(null);
     try {
       const res = await fetch(NET_INFO_URL);
@@ -122,8 +140,6 @@ export default function NetstatsPage() {
     } catch (err: any) {
       setErrorNet(err.message || "Unknown error");
       setNetInfo(null);
-    } finally {
-      setLoadingNet(false);
     }
   }, []);
 
@@ -179,10 +195,6 @@ export default function NetstatsPage() {
   }, [networkStats]);
 
   const roundState = dump?.result?.round_state;
-  const height = roundState?.height || "—";
-  const round = roundState?.round ?? "—";
-  const step = roundState?.step ?? "—";
-  const proposer = roundState?.validators?.proposer?.address || "—";
   const proposerObj = roundState?.validators?.validators?.find?.(
     (v: any) => v.address === proposer
   );
@@ -241,7 +253,7 @@ export default function NetstatsPage() {
     {
       title: "Latest Height",
       description: "The current block height of the blockchain, representing the total number of blocks.",
-      value: `#${parseInt(height).toLocaleString()}`,
+      value: `#${height}`,
       icon: Layers,
       accent: "blue",
     },
