@@ -31,6 +31,7 @@ import { SupportUS } from "./components/SupportUs";
 import LastBlockConsensusTab from "./heartbeat/components/LastBlockConsensus";
 import PeersTableTab from "./heartbeat/components/PeersTableTab";
 import { useTendermint } from "./context/TendermintListener";
+import { isEqual } from "lodash";
 
 const rowVariants = {
   initial: { opacity: 0, y: -20 },
@@ -72,21 +73,30 @@ export default function NetstatsPage() {
 
   useEffect(() => {
     if (!event) return;
+
     if (event.height) {
       const heightNum = Number(event.height);
-      if (!isNaN(heightNum)) {
-        setHeight(heightNum.toLocaleString());
-      } else {
-        setHeight(String(event.height));
+      const formattedHeight = !isNaN(heightNum)
+        ? heightNum.toLocaleString()
+        : String(event.height);
+      if (formattedHeight !== height) {
+        setHeight(formattedHeight);
       }
     }
-    if (event.round)
+
+    if (event.round && event.round !== round) {
       setRound(event.round);
-    if (event.stepValue)
+    }
+
+    if (event.stepValue && event.stepValue !== step) {
       setStep(event.stepValue);
-    if (event.proposer)
+    }
+
+    if (event.proposer && event.proposer !== proposer) {
       setProposer(event.proposer);
-  }, [event]);
+    }
+  }, [event, height, round, step, proposer]);
+
 
   const handleSort = (key: string) => {
     if (sortBy === key) {
@@ -148,18 +158,18 @@ export default function NetstatsPage() {
   const [stats, setStats] = useState<NetworkMessage>();
 
   useEffect(() => {
-    if (!nodesStats) return
-    if (!equal(prevNodesRef.current, nodesStats?.stats)) {
-      setNodes(nodesStats?.stats);
-      prevNodesRef.current = nodesStats?.stats;
+    if (!nodesStats || !nodesStats.stats) return;
 
-      setVersions(
-        nodesStats?.stats.map((node: Stats) => {
-          return node.version;
-        })
-      );
+    const newStats = nodesStats.stats;
+
+    if (!equal(prevNodesRef.current, newStats)) {
+      prevNodesRef.current = newStats;
+      setNodes(newStats);
+
+      setVersions(newStats.map((node: Stats) => node.version));
     }
   }, [nodesStats]);
+
   useEffect(() => {
     fetchDump();
     const interval = setInterval(() => {
@@ -191,8 +201,10 @@ export default function NetstatsPage() {
   }
 
   useEffect(() => {
-    setStats(networkStats)
-  }, [networkStats]);
+    if (!isEqual(stats, networkStats)) {
+      setStats(networkStats);
+    }
+  }, [networkStats, stats]);
 
   const roundState = dump?.result?.round_state;
   const proposerObj = roundState?.validators?.validators?.find?.(
