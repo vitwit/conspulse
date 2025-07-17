@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback, useRef, useMemo } from "react"
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import { NodeStats } from "./lib/api";
+import throttle from "lodash/throttle";
 
 import dynamic from "next/dynamic";
 
@@ -158,42 +159,30 @@ export default function NetstatsPage() {
     }
   }, []);
 
-  const prevNodesRef = useRef<Stats[]>([]);
 
   const [stats, setStats] = useState<NetworkMessage>();
 
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const latestStatsRef = useRef<any>(null);
-  const prevStatsNodesRef = useRef<any>(null);
 
-  const DEBOUNCE_DELAY = 2000; // 2 seconds
+  const UPDATE_INTERVAL = 2000;
+
+  const prevStatsRef = useRef<any>(null);
+
+  // one stable throttled function for the life of the component
+  const applyStats = useRef(
+    throttle((stats: Stats[]) => {
+      if (!equal(prevStatsRef.current, stats)) {
+        prevStatsRef.current = stats;
+        setNodes(stats);
+        setVersions(stats.map(s => s.version));
+      }
+    }, UPDATE_INTERVAL, { leading: true, trailing: true })
+  ).current;
 
   useEffect(() => {
-    if (!nodesStats || !nodesStats.stats) return;
-
-    latestStatsRef.current = nodesStats.stats;
-
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
+    if (nodesStats?.stats) {
+      applyStats(nodesStats.stats);
     }
-
-    debounceTimeoutRef.current = setTimeout(() => {
-      const newStats = latestStatsRef.current;
-
-      if (!equal(prevStatsNodesRef.current, newStats)) {
-        prevStatsNodesRef.current = newStats;
-        setNodes(newStats);
-        setVersions(newStats.map((node: Stats) => node.version));
-      }
-    }, DEBOUNCE_DELAY);
-
-    return () => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-    };
-  }, [nodesStats]);
-
+  }, [nodesStats, applyStats]);
 
   useEffect(() => {
     fetchDump();
@@ -266,15 +255,30 @@ export default function NetstatsPage() {
     };
   }
 
-  const nodesLocation = nodes.map((node: Stats) => {
-    return {
+  const prevNodesRef = useRef<Stats[] | null>(null);
+
+  const nodesLocation = useMemo(() => {
+    if (prevNodesRef.current && equal(prevNodesRef.current, nodes)) {
+      return prevNodesRef.current.map((node: Stats) => ({
+        latitude: node.latitude,
+        longitude: node.longitude,
+        nodeName: node.country,
+        radius: 5,
+        fillKey: "success",
+      }));
+    }
+
+    // Update previous nodes for next render
+    prevNodesRef.current = nodes;
+
+    return nodes.map((node: Stats) => ({
       latitude: node.latitude,
       longitude: node.longitude,
       nodeName: node.country,
       radius: 5,
       fillKey: "success",
-    };
-  });
+    }));
+  }, [nodes]);
 
   const lastBlockVotesInfo = parseBitArray(lastCommitBitArray);
 
