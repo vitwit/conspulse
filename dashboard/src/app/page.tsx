@@ -71,35 +71,35 @@ export default function NetstatsPage() {
   const [proposer, setProposer] = useState<string>("");
   const event = useTendermint();
 
-useEffect(() => {
-  if (!event) return;
+  useEffect(() => {
+    if (!event) return;
 
-  const timeout = setTimeout(() => {
-    if (event.height) {
-      const heightNum = Number(event.height);
-      const formattedHeight = !isNaN(heightNum)
-        ? heightNum.toLocaleString()
-        : String(event.height);
-      if (formattedHeight !== height && formattedHeight > height) {
-        setHeight(formattedHeight);
+    const timeout = setTimeout(() => {
+      if (event.height) {
+        const heightNum = Number(event.height);
+        const formattedHeight = !isNaN(heightNum)
+          ? heightNum.toLocaleString()
+          : String(event.height);
+        if (formattedHeight !== height && formattedHeight > height) {
+          setHeight(formattedHeight);
+        }
       }
-    }
 
-    if (event.round && event.round !== round) {
-      setRound(event.round);
-    }
+      if (event.round && event.round !== round) {
+        setRound(event.round);
+      }
 
-    if (event.stepValue && event.stepValue !== step) {
-      setStep(event.stepValue);
-    }
+      if (event.stepValue && event.stepValue !== step) {
+        setStep(event.stepValue);
+      }
 
-    if (event.proposer && event.proposer !== proposer) {
-      setProposer(event.proposer);
-    }
-  }, 100);
+      if (event.proposer && event.proposer !== proposer) {
+        setProposer(event.proposer);
+      }
+    }, 100);
 
-  return () => clearTimeout(timeout);
-}, [event, height, round, step, proposer]);
+    return () => clearTimeout(timeout);
+  }, [event, height, round, step, proposer]);
 
 
 
@@ -162,21 +162,37 @@ useEffect(() => {
 
   const [stats, setStats] = useState<NetworkMessage>();
 
-useEffect(() => {
-  if (!nodesStats || !nodesStats.stats) return;
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const latestStatsRef = useRef<any>(null);
+  const prevStatsNodesRef = useRef<any>(null);
 
-  const timeout = setTimeout(() => {
-    const newStats = nodesStats.stats;
+  const DEBOUNCE_DELAY = 2000; // 2 seconds
 
-    if (!equal(prevNodesRef.current, newStats)) {
-      prevNodesRef.current = newStats;
-      setNodes(newStats);
-      setVersions(newStats.map((node: Stats) => node.version));
+  useEffect(() => {
+    if (!nodesStats || !nodesStats.stats) return;
+
+    latestStatsRef.current = nodesStats.stats;
+
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
     }
-  }, 100);
 
-  return () => clearTimeout(timeout);
-}, [nodesStats]);
+    debounceTimeoutRef.current = setTimeout(() => {
+      const newStats = latestStatsRef.current;
+
+      if (!equal(prevStatsNodesRef.current, newStats)) {
+        prevStatsNodesRef.current = newStats;
+        setNodes(newStats);
+        setVersions(newStats.map((node: Stats) => node.version));
+      }
+    }, DEBOUNCE_DELAY);
+
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, [nodesStats]);
 
 
   useEffect(() => {
@@ -209,15 +225,15 @@ useEffect(() => {
     );
   }
 
-useEffect(() => {
-  const timeout = setTimeout(() => {
-    if (!isEqual(stats, networkStats)) {
-      setStats(networkStats);
-    }
-  }, 100);
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (!isEqual(stats, networkStats)) {
+        setStats(networkStats);
+      }
+    }, 100);
 
-  return () => clearTimeout(timeout);
-}, [networkStats, stats]);
+    return () => clearTimeout(timeout);
+  }, [networkStats, stats]);
 
 
   const roundState = dump?.result?.round_state;
