@@ -231,7 +231,7 @@ export class Database {
             const rows: any = await result.json<{ count: number }[]>();
             return rows?.data[0]?.count > 0;
         } catch (err) {
-            logger.error('Failed to check if node is registered:', err);
+            logger.error(`Failed to check if node is registered: ${err}`);
             throw err;
         }
     }
