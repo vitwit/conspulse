@@ -71,15 +71,16 @@ export default function NetstatsPage() {
   const [proposer, setProposer] = useState<string>("");
   const event = useTendermint();
 
-  useEffect(() => {
-    if (!event) return;
+useEffect(() => {
+  if (!event) return;
 
+  const timeout = setTimeout(() => {
     if (event.height) {
       const heightNum = Number(event.height);
       const formattedHeight = !isNaN(heightNum)
         ? heightNum.toLocaleString()
         : String(event.height);
-      if (formattedHeight !== height) {
+      if (formattedHeight !== height && formattedHeight > height) {
         setHeight(formattedHeight);
       }
     }
@@ -95,7 +96,11 @@ export default function NetstatsPage() {
     if (event.proposer && event.proposer !== proposer) {
       setProposer(event.proposer);
     }
-  }, [event, height, round, step, proposer]);
+  }, 100);
+
+  return () => clearTimeout(timeout);
+}, [event, height, round, step, proposer]);
+
 
 
   const handleSort = (key: string) => {
@@ -157,18 +162,22 @@ export default function NetstatsPage() {
 
   const [stats, setStats] = useState<NetworkMessage>();
 
-  useEffect(() => {
-    if (!nodesStats || !nodesStats.stats) return;
+useEffect(() => {
+  if (!nodesStats || !nodesStats.stats) return;
 
+  const timeout = setTimeout(() => {
     const newStats = nodesStats.stats;
 
     if (!equal(prevNodesRef.current, newStats)) {
       prevNodesRef.current = newStats;
       setNodes(newStats);
-
       setVersions(newStats.map((node: Stats) => node.version));
     }
-  }, [nodesStats]);
+  }, 100);
+
+  return () => clearTimeout(timeout);
+}, [nodesStats]);
+
 
   useEffect(() => {
     fetchDump();
@@ -200,11 +209,16 @@ export default function NetstatsPage() {
     );
   }
 
-  useEffect(() => {
+useEffect(() => {
+  const timeout = setTimeout(() => {
     if (!isEqual(stats, networkStats)) {
       setStats(networkStats);
     }
-  }, [networkStats, stats]);
+  }, 100);
+
+  return () => clearTimeout(timeout);
+}, [networkStats, stats]);
+
 
   const roundState = dump?.result?.round_state;
   const proposerObj = roundState?.validators?.validators?.find?.(
