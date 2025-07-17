@@ -77,6 +77,10 @@ export class Database {
     private nodes: NodeInfo[];
     private latestStats: NodeStatsMap = new Map();
 
+    private statsBuffer: NodeStats[] = [];
+    private flushTimeout: NodeJS.Timeout | null = null;
+
+
     constructor(host: string, username: string, password: string, database?: string) {
         this.client = createClient({
             url: host,
@@ -162,23 +166,33 @@ export class Database {
     }
 
     async storeNodeStats(stats: NodeStats): Promise<void> {
-        try {
-            await this.client.insert({
-                table: 'node_stats',
-                values: [stats],
-                format: 'JSONEachRow',
-            });
+        const key = stats.nodeID || stats.address;
+        this.latestStats.set(key, stats);
 
-            const key = stats.nodeID || stats.address;
-            this.latestStats.set(key, stats);
+        this.statsBuffer.push(stats);
 
-            await this.broadcastStats();
+        if (!this.flushTimeout) {
+            this.flushTimeout = setTimeout(async () => {
+                const batch = [...this.statsBuffer];
+                this.statsBuffer = [];
+                this.flushTimeout = null;
 
-        } catch (err) {
-            console.log(err);
-            throw err;
+                try {
+                    if (batch.length > 0) {
+                        await this.client.insert({
+                            table: 'node_stats',
+                            values: batch,
+                            format: 'JSONEachRow',
+                        });
+
+                        await this.broadcastStats();
+                    }
+                } catch (err) {
+                    console.error("Failed to batch-insert stats:", err);
+                    // Optionally: re-queue batch
+                }
+            }, 1000);
         }
-
     }
 
     async updateNode(node: NodeInfo): Promise<void> {
