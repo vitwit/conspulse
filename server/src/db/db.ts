@@ -216,9 +216,10 @@ export class Database {
 
     async isNodeRegistered(address: string): Promise<boolean> {
         const query = `
-        SELECT count() as count
+        SELECT 1
         FROM nodes
         WHERE address = {address:String}
+        LIMIT 1
     `;
 
         try {
@@ -228,8 +229,8 @@ export class Database {
                 format: 'JSON',
             });
 
-            const rows: any = await result.json<{ count: number }[]>();
-            return rows?.data[0]?.count > 0;
+            const rows: any = await result.json();
+            return rows?.data?.length > 0;
         } catch (err) {
             logger.error(`Failed to check if node is registered: ${err}`);
             throw err;
