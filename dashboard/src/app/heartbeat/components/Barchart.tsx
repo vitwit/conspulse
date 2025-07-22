@@ -62,6 +62,15 @@ export default function BarChart({ data, labels, label, color = '#4C78A8', showI
             stepSize: 1,
           }
           : {},
+        suggestedMin: showIntegersOnly ? 1 : undefined,
+        min: showIntegersOnly ? 1 : undefined,
+        afterDataLimits: scale => {
+          if (showIntegersOnly) {
+            if (scale.max < 5) {
+              scale.max = 5;
+            }
+          }
+        },
       },
     },
   };

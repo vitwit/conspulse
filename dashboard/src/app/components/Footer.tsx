@@ -21,10 +21,10 @@ export default function Footer() {
           </div>
           <h3 className="font-semibold text-base text-gray-300 mb-1">About Conspulse</h3>
           <p className="text-gray-400 leading-relaxed text-sm">
-            <span className="font-bold text-white">Conspulse</span> is a Tendermint validator dashboard for{" "}
-            <span className="font-semibold text-cyan-400">{NETWORK_NAME}</span>. It provides real-time consensus state,
-            validator stats, and network insights to help monitor performance and health. Support us by delegating to the{" "}
-            <span className="text-cyan-400 font-semibold">Vitwit Validator</span>.
+            <span className="font-bold text-white">Conspulse</span> Conspulse is a consensus dashboard for Tendermint (CometBFT) based networks like{" "}
+            <span className="font-semibold text-cyan-400">{NETWORK_NAME}</span>. It provides real-time consensus state, validator tracking, and network
+            insights to help monitor performance and health. Support us by delegating to the{" "}
+            <span className="text-cyan-400 font-semibold"><a href="https://staking.polygon.technology/validators/50" target="_blank" >Vitwit Validator</a></span>.
           </p>
         </div>
 
@@ -32,7 +32,7 @@ export default function Footer() {
         <div className="flex-1 flex flex-col items-start sm:items-end gap-3">
           <div className="flex gap-5">
             <a
-              href="mailto:hello@vitwit.com"
+              href="mailto:contact@vitwit.com"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Email"

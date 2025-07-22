@@ -4,19 +4,15 @@ import { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faClipboard, faCheck } from '@fortawesome/free-solid-svg-icons';
 
-export type ShortNameProps = {
+export type MonikerProps = {
     value: string;
-    maxLength: number;
+    name: string;
     iconColor?: string;
+    explorerUrl: string;
 };
 
-export default function ShortName({ value, maxLength, iconColor = "text-gray-600" }: ShortNameProps) {
+export default function Moniker({ name, value, iconColor = "text-gray-600", explorerUrl = "" }: MonikerProps) {
     const [copied, setCopied] = useState(false);
-
-    const shorten = (str: string, chars = 6): string => {
-        if (!str) return '';
-        return `${str.slice(0, chars)}...${str.slice(-chars)}`;
-    }
 
     const handleCopy = async () => {
         await navigator.clipboard.writeText(value);
@@ -26,7 +22,15 @@ export default function ShortName({ value, maxLength, iconColor = "text-gray-600
 
     return (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span className='text-gray-200 text-xs'>{shorten(value, maxLength)}</span>
+            <a
+                href={`${explorerUrl}/${value}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-200 text-xs hover:underline"
+                style={{ textDecorationThickness: '1px' }}
+            >
+                {name}
+            </a>
             <button
                 onClick={handleCopy}
                 title="Copy"
@@ -44,4 +48,3 @@ export default function ShortName({ value, maxLength, iconColor = "text-gray-600
         </span>
     );
 }
-

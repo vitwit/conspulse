@@ -7,7 +7,6 @@ import throttle from "lodash/throttle";
 
 import dynamic from "next/dynamic";
 
-import ShortName from "./components/ShortName";
 import equal from "fast-deep-equal";
 import NodeVersionsChart from "./components/NodeVersions";
 import {
@@ -20,6 +19,7 @@ import {
   Timer,
   Vote,
   User,
+  Info,
 } from "lucide-react";
 import { BlockPropagationGraph } from "./heartbeat/components/BlockPropagationGraph";
 import BarChart from "./heartbeat/components/Barchart";
@@ -33,6 +33,8 @@ import LastBlockConsensusTab from "./heartbeat/components/LastBlockConsensus";
 import PeersTableTab from "./heartbeat/components/PeersTableTab";
 import { useTendermint } from "./context/TendermintListener";
 import { isEqual } from "lodash";
+import ShortProposerName from "./components/ShortProposer";
+import DescriptionTooltip from "./components/DescriptionTooltip";
 
 const rowVariants = {
   initial: { opacity: 0, y: -20 },
@@ -43,6 +45,20 @@ const rowVariants = {
 const NodeMap = dynamic(() => import("./components/NodeMap"), {
   ssr: false,
 });
+
+
+const colorClasses: Record<string, string> = {
+  cyan: "text-cyan-400",
+  emerald: "text-emerald-400",
+  violet: "text-violet-400",
+  stone: "text-stone-400",
+  blue: "text-blue-400",
+  indigo: "text-indigo-400",
+  lime: "text-lime-400",
+  fuchsia: "text-fuchsia-400",
+  pink: "text-pink-400",
+  amber: "text-amber-400",
+};
 
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
@@ -113,23 +129,77 @@ export default function NetstatsPage() {
     }
   };
 
-  const sortedNodes = useMemo(() => {
-    return [...nodes].sort((a, b) => {
-      const aVal = a[sortBy as keyof NodeStats];
-      const bVal = b[sortBy as keyof NodeStats];
 
-      if (aVal == null) return 1;
-      if (bVal == null) return -1;
+  const [favoriteNodes, setFavoriteNodes] = useState<Set<string>>(new Set());
 
-      if (typeof aVal === 'number' && typeof bVal === 'number') {
-        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+  const toggleFavorite = (address: string) => {
+    setFavoriteNodes((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(address)) {
+        newSet.delete(address);
+      } else {
+        newSet.add(address);
       }
-
-      return sortDirection === 'asc'
-        ? String(aVal).localeCompare(String(bVal))
-        : String(bVal).localeCompare(String(aVal));
+      return newSet;
     });
-  }, [nodes, sortBy, sortDirection]);
+  };
+
+
+  const sortedNodes = useMemo(() => {
+    return [...nodes]
+      .sort((a, b) => {
+        // Favorited nodes come first
+        const aFav = favoriteNodes.has(a.address);
+        const bFav = favoriteNodes.has(b.address);
+        if (aFav !== bFav) return aFav ? -1 : 1;
+
+        const aVal = a[sortBy as keyof Stats];
+        const bVal = b[sortBy as keyof Stats];
+
+        if (aVal == null) return 1;
+        if (bVal == null) return -1;
+
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+        }
+
+        return sortDirection === 'asc'
+          ? String(aVal).localeCompare(String(bVal))
+          : String(bVal).localeCompare(String(aVal));
+      });
+  }, [nodes, sortBy, sortDirection, favoriteNodes]);
+
+
+
+  const [updatedRows, setUpdatedRows] = useState<Set<string>>(new Set());
+  const previousNodesRef = useRef<Stats[]>([]);
+
+  useEffect(() => {
+    const updated = new Set<string>();
+
+    nodes.forEach((node) => {
+      const previous = previousNodesRef.current.find((n) => n.address === node.address);
+      if (previous && JSON.stringify(previous) !== JSON.stringify(node)) {
+        updated.add(node.address);
+      }
+    });
+
+    if (updated.size > 0) {
+      setUpdatedRows((prev) => new Set([...prev, ...updated]));
+
+      // Remove highlights after 2 second
+      setTimeout(() => {
+        setUpdatedRows((prev) => {
+          const copy = new Set(prev);
+          updated.forEach((id) => copy.delete(id));
+          return copy;
+        });
+      }, 2_000);
+    }
+
+    previousNodesRef.current = nodes;
+  }, [nodes]);
+
 
 
 
@@ -214,6 +284,8 @@ export default function NetstatsPage() {
     );
   }
 
+
+
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (!isEqual(stats, networkStats)) {
@@ -282,18 +354,6 @@ export default function NetstatsPage() {
 
   const lastBlockVotesInfo = parseBitArray(lastCommitBitArray);
 
-  const colorClasses: Record<string, string> = {
-    cyan: "text-cyan-400",
-    emerald: "text-emerald-400",
-    violet: "text-violet-400",
-    stone: "text-stone-400",
-    blue: "text-blue-400",
-    indigo: "text-indigo-400",
-    lime: "text-lime-400",
-    fuchsia: "text-fuchsia-400",
-    pink: "text-pink-400",
-    amber: "text-amber-400",
-  };
 
   const metrics = [
     {
@@ -319,7 +379,7 @@ export default function NetstatsPage() {
     },
     {
       title: "Round",
-      descirption: "The current round number within the consensus process for the latest block.",
+      description: "The current round number within the consensus process for the latest block.",
       value: round ?? "—",
       icon: RotateCcw,
       accent: "stone",
@@ -333,7 +393,7 @@ export default function NetstatsPage() {
     },
     {
       title: "Validators",
-      descirption: "The total number of active validators participating in block proposal and voting.",
+      description: "The total number of active validators participating in block proposal and voting.",
       value: validators?.length ?? "—",
       icon: Shield,
       accent: "indigo",
@@ -347,7 +407,7 @@ export default function NetstatsPage() {
     },
     {
       title: "Votes %",
-      descirption: "The percentage of validators that signed the last block during the precommit stage.",
+      description: "The percentage of validators that signed the last block during the precommit stage.",
       value: lastBlockVotesInfo?.percent
         ? `${lastBlockVotesInfo.percent}%`
         : "—",
@@ -356,14 +416,14 @@ export default function NetstatsPage() {
     },
     {
       title: "Proposer",
-      descirption: "The validator currently proposing the current block",
-      value: ShortName({ value: proposer, maxLength: 6 }) || "—",
+      description: "The validator currently proposing the current block",
+      value: ShortProposerName({ value: proposer, maxLength: 6 }) || "—",
       icon: User,
       accent: "cyan",
     },
     {
       title: "Voting Power",
-      descirption: "The voting power (stake) of the current block proposer",
+      description: "The voting power (stake) of the current block proposer",
       value: parseInt(proposerObj?.voting_power)?.toLocaleString() ?? "—",
       icon: Shield,
       accent: "amber",
@@ -403,36 +463,36 @@ export default function NetstatsPage() {
 
           <div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4 p-4 bg-[#0e1014] text-white font-sans">
-              {metrics.map(({ title, value, icon: Icon, accent, descirption }) => (
+              {metrics.map(({ title, value, icon: Icon, accent, description }) => (
                 <div
                   key={title}
                   className="bg-[#1a1e24] rounded-lg px-5 py-4 border border-[#2a2f3a] hover:border-cyan-400 transition shadow-sm"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-md font-semibold text-teal-400 group-hover:text-white"
-                      title={descirption}
-                    >
-                      {title}
-                    </h3>
+
+                    <DescriptionTooltip title={title} description={description || "-"} />
+
                     <Icon className={`w-6 h-6 ${colorClasses[accent]}`} />
                   </div>
                   <div
                     className={`text-3xl font-mono font-bold ${colorClasses[accent]} leading-tight truncate`}
-                  // title={value}
                   >
                     {value}
                   </div>
                 </div>
               ))}
 
+
               <div
                 key="bit-array"
                 className="bg-[#1a1e24] md:col-span-3 col-span-2 rounded-lg px-5 py-4 border border-[#2a2f3a] hover:border-cyan-400 transition shadow-sm"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-md font-semibold text-teal-400 group-hover:text-white">
-                    Block Votes
-                  </h3>
+                  <DescriptionTooltip
+
+                    title="Block Votes"
+                    description="Votes cast by validators for the current block."
+                  />
                   <User className={`w-6 h-6 text-lime-400`} />
                 </div>
                 <div
@@ -453,12 +513,21 @@ export default function NetstatsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 gap-4 px-4 pb-4 bg-[#0e1014] text-white font-sans">
               <div className="bg-[#1a1e24] rounded-lg p-4 shadow-sm border border-[#2a2f3a]">
-                <h3 className="text-sm font-semibold text-teal-400 mb-2">Block Propagation</h3>
+
+                <div className="flex items-center justify-between mb-2">
+                  <DescriptionTooltip
+                    description="Distribution of block receive times after proposal."
+                    title="Block Propagation"
+                  />
+                </div>
                 <BlockPropagationGraph data={stats?.blockPropagation} />
               </div>
 
               <div className="bg-[#1a1e24] rounded-lg p-4 shadow-sm border border-[#2a2f3a]">
-                <h3 className="text-sm font-semibold text-teal-400 mb-2">Block Time</h3>
+                <DescriptionTooltip
+                  title="Block Time"
+                  description="Time taken to produce each block at every height."
+                />
                 <BarChart
                   data={stats?.blocksWindow?.map(stat => (stat.blockTime / 1000).toFixed(2)) || [0, 0, 0]}
                   labels={stats?.blocksWindow?.map(stat => stat.blockNumber) || [0, 0, 0]}
@@ -468,7 +537,10 @@ export default function NetstatsPage() {
               </div>
 
               <div className="bg-[#1a1e24] rounded-lg p-4 shadow-sm border border-[#2a2f3a]">
-                <h3 className="text-sm font-semibold text-teal-400 mb-2">Transactions</h3>
+                <DescriptionTooltip
+                  title="Transactions"
+                  description="Number of transactions included in each block."
+                />
                 <BarChart
                   data={stats?.blocksWindow?.map(stat => stat.txnCount) || [0, 0, 0]}
                   labels={stats?.blocksWindow?.map(stat => stat.blockNumber) || [0, 0, 0]}
@@ -479,7 +551,10 @@ export default function NetstatsPage() {
               </div>
 
               <div className="bg-[#1a1e24] rounded-lg p-4 shadow-sm border border-[#2a2f3a]">
-                <h3 className="text-sm font-semibold text-teal-400 mb-2">Nodes Map</h3>
+                <DescriptionTooltip
+                  title="Nodes Map"
+                  description="Geographical distribution of network nodes."
+                />
                 <NodeMap data={nodesLocation} />
               </div>
             </div>
@@ -513,6 +588,9 @@ export default function NetstatsPage() {
               handleSort={handleSort}
               formatLatency={formatLatency}
               rowVariants={rowVariants}
+              updatedRows={updatedRows}
+              favoriteNodes={favoriteNodes}
+              toggleFavorite={toggleFavorite}
             />
 
           )}

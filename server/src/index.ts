@@ -54,8 +54,8 @@ export const server = createServer(app);
 
 // CRON section for cleanup
 
-// Schedule task to run every 10 minutes
-cron.schedule('*/10 * * * *', async () => {
+// Schedule task to run every 15 minutes
+cron.schedule('*/15 * * * *', async () => {
     logger.info(`Pruning records job started`);
     await db.cleanOldRecords();
 

@@ -60,3 +60,17 @@ svg circle {
   display: none;
   /* Chrome, Safari, Opera */
 }
+
+@keyframes fadeGreen {
+  0% {
+    background-color: #3d9c60;
+  }
+
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-fadeGreen {
+  animation: fadeGreen 1s ease forwards;
+}

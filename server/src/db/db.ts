@@ -285,36 +285,49 @@ ORDER BY blockTime DESC;
 
     async cleanOldRecords(): Promise<void> {
         const cutoffQuery = `
-    WITH ranked AS (
+        WITH ranked AS (
+            SELECT
+                address,
+                height,
+                row_number() OVER (PARTITION BY address ORDER BY height DESC) AS rn
+            FROM node_stats
+        )
         SELECT
             address,
-            height,
-            row_number() OVER (PARTITION BY address ORDER BY height DESC) AS rn
-        FROM node_stats
-    )
-    SELECT
-        address,
-        MIN(height) AS minHeightToKeep
-    FROM ranked
-    WHERE rn <= 5000
-    GROUP BY address
-  `;
+            MIN(height) AS minHeightToKeep
+        FROM ranked
+        WHERE rn <= 5000
+        GROUP BY address
+    `;
 
         try {
+            logger.info(`Pruning records job started`);
+
             const result: CutoffResult[] = await this.client
                 .query({ query: cutoffQuery, format: 'JSONEachRow' })
                 .then((res) => res.json());
 
-            for (const row of result) {
-                const { address, minHeightToKeep } = row;
+            const batchSize = 50;
+
+            for (let i = 0; i < result.length; i += batchSize) {
+                const batch = result.slice(i, i + batchSize);
+
+                const conditions = batch.map(({ address, minHeightToKeep }) => {
+                    logger.info(`Preparing cleanup for ${address} below height ${minHeightToKeep}`);
+                    return `(address = '${address}' AND height < ${minHeightToKeep})`;
+                }).join(' OR ');
 
                 const deleteQuery = `
-        ALTER TABLE node_stats
-        DELETE WHERE address = '${address}' AND height < ${minHeightToKeep}
-      `;
+                ALTER TABLE node_stats
+                DELETE WHERE ${conditions}
+            `;
 
-                logger.info(`Cleaning ${address} below height ${minHeightToKeep}`);
-                await this.client.command({ query: deleteQuery });
+                try {
+                    await this.client.command({ query: deleteQuery });
+                    logger.info(`Deleted records for batch ${i / batchSize + 1}/${Math.ceil(result.length / batchSize)}`);
+                } catch (err) {
+                    logger.error(`Delete failed for batch ${i / batchSize + 1}:`, err);
+                }
             }
 
             logger.info('Cleanup completed.');

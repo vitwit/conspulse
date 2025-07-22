@@ -1,7 +1,8 @@
 'use client';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import ShortName from './../../components/ShortName';
+import Moniker from '@/app/components/Moniker';
 
 interface Stats {
     address: string;
@@ -29,6 +30,9 @@ interface Props {
     handleSort: (key: string) => void;
     formatLatency: (ms: number) => string;
     rowVariants: any;
+    updatedRows: any;
+    favoriteNodes: Set<string>;
+  toggleFavorite: (address: string) => void;
 }
 
 const PeersTableTab: React.FC<Props> = ({
@@ -39,9 +43,13 @@ const PeersTableTab: React.FC<Props> = ({
     handleSort,
     formatLatency,
     rowVariants,
+    updatedRows,
+    favoriteNodes,
+    toggleFavorite,
 }) => {
     const headers = [
-        'Validator Address',
+          '★',
+        '#',
         'Moniker',
         'Node ID',
         'Earliest Height',
@@ -66,18 +74,32 @@ const PeersTableTab: React.FC<Props> = ({
                         {headers.map((title, index) => {
                             const key = title.toLowerCase().replace(/ /g, '');
                             const isSorted = sortBy === key;
+
                             return (
                                 <th
                                     key={index}
                                     onClick={() => handleSort(key)}
-                                    className="cursor-pointer px-4 py-3 whitespace-nowrap hover:text-white transition text-teal-400"
+                                    className="cursor-pointer px-4 py-3 whitespace-nowrap hover:text-white transition text-teal-400 select-none"
                                 >
-                                    {title} {isSorted ? (sortDirection === 'asc' ? '▲' : '▼') : ''}
+                                    <div className="flex items-center gap-1">
+                                        <span>{title}</span>
+                                        {title !== "#" && (
+                                            <span className="flex flex-col leading-[0.8] text-[10px] ml-0.5">
+                                                <span className={`${isSorted && sortDirection === 'asc' ? 'text-white' : 'text-gray-500'}`}>
+                                                    ▲
+                                                </span>
+                                                <span className={`${isSorted && sortDirection === 'desc' ? 'text-white' : 'text-gray-500'}`}>
+                                                    ▼
+                                                </span>
+                                            </span>
+                                        )}
+                                    </div>
                                 </th>
                             );
                         })}
                     </tr>
                 </thead>
+
                 <tbody>
                     {nodes.length === 0 ? (
                         <tr>
@@ -87,48 +109,60 @@ const PeersTableTab: React.FC<Props> = ({
                         </tr>
                     ) : (
                         <AnimatePresence>
-                            {sortedNodes.map((node: Stats, idx: number) => (
-                                <motion.tr
-                                    key={node.address || idx}
+                            {sortedNodes.map((node: Stats, idx: number) => {
+
+                                return (
+                                    <motion.tr
+                                        key={node.address || idx}
                                     layout
-                                    initial="hidden"
+                                        initial="hidden"
                                     animate="visible"
                                     exit="exit"
                                     variants={rowVariants}
                                     transition={{ duration: 0.3 }}
-                                    className="hover:bg-[#2e3440] border-b border-[#2a2f3a]"
-                                >
-                                    {[
-                                        <ShortName key={node.address} value={node.address} maxLength={9} />,
-                                        node.moniker,
-                                        <ShortName key={node.nodeID} value={node.nodeID} maxLength={7} />,
-                                        node.earliestBlockHeight.toLocaleString(),
-                                        node.latestBlockHeight.toLocaleString(),
-                                        <ShortName key={node.latestAppHash} value={node.latestAppHash} maxLength={7} />,
-                                        `${Math.floor((Date.now() - node.blockTime * 1000) / 1000)}s ago`,
-                                        node.isSyncing ? 'Syncing' : 'Yes',
-                                        node.network,
-                                        node.votingPower,
-                                        node.peers.length || 0,
-                                        node.version,
-                                        node.os,
-                                        node.goVersion,
-                                        formatLatency(node.latency),
-                                    ].map((value, i) => (
-                                        <td key={i} className="px-4 py-2 font-mono text-sm text-gray-100 whitespace-nowrap">
-                                            <motion.div
-                                                initial="initial"
+                                    className={`hover:bg-[#2e3440] border-b border-[#2a2f3a] ${
+    updatedRows.has(node.address) ? 'animate-fadeGreen' : ''
+  }`}
+                                    >
+                                        {[
+                                              <button
+    onClick={() => toggleFavorite(node.address)}
+    className="text-xl text-yellow-400 focus:outline-none transition-transform"
+    title={favoriteNodes.has(node.address) ? 'Unfavorite' : 'Favorite'}
+  >
+    {favoriteNodes.has(node.address) ? '★' : '☆'}
+  </button>,
+                                            idx + 1,
+                                            <Moniker name={node.moniker} value={`0x${node.address}`} explorerUrl='http://localhost:1317/' />,
+                                            <ShortName value={node.nodeID} maxLength={7} />,
+                                            node.earliestBlockHeight.toLocaleString(),
+                                            node.latestBlockHeight.toLocaleString(),
+                                            <ShortName value={node.latestAppHash} maxLength={7} />,
+                                            `${Math.floor((Date.now() - node.blockTime * 1000) / 1000)}s ago`,
+                                            node.isSyncing ? 'Syncing' : 'Yes',
+                                            node.network,
+                                            node.votingPower,
+                                            node.peers.length || 0,
+                                            node.version,
+                                            node.os,
+                                            node.goVersion,
+                                            formatLatency(node.latency),
+                                        ].map((value, i) => (
+                                            <td key={i} className="px-4 py-2 font-mono text-sm text-gray-100 whitespace-nowrap">
+                                                <motion.div
+                                                    initial="initial"
                                                 animate="animate"
                                                 exit="exit"
                                                 variants={rowVariants}
                                                 transition={{ duration: 0.3 }}
-                                            >
-                                                {value || '—'}
-                                            </motion.div>
-                                        </td>
-                                    ))}
-                                </motion.tr>
-                            ))}
+                                                >
+                                                    {value || '—'}
+                                                </motion.div>
+                                            </td>
+                                        ))}
+                                    </motion.tr>
+                                );
+                            })}
                         </AnimatePresence>
                     )}
                 </tbody>
