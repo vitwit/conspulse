@@ -4,17 +4,20 @@ Conspulse is a modern Tendermint validator dashboard for networks like the Polyg
 
 ## Features
 - Live consensus state and validator stats
-- Auto-refresh every 10 seconds
+- Auto-refresh every block
 - Favourites and sorting for validators
 - Voting and precommit status per validator
 
 ## Getting Started
 
-### Prerequisites
-- Node.js (v18+ recommended)
-- npm
 
 ## Server Setup 
+
+### Prerequisites
+ - Node.js (v22+ recommended)
+ - Click House Database
+ - npm
+
 1. Clone the repository:
 
 ``` sh
@@ -61,6 +64,7 @@ NEXT_PUBLIC_NETWORK_NAME=Polygon Localnet
 NEXT_PUBLIC_SCRIPT_API_URL=http://localhost:8080
 NEXT_PUBLIC_WEBSOCKET = ws://localhost:26657/
 NEXT_PUBLIC_METRICS_BACKEND_URL= http://localhost:3000
+NEXT_PUBLIC_EXPLORER_URL=https://polygonscan.com/address/
 ```
 
 2. Install dependencies

@@ -1,0 +1,63 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: conspulse-clickhouse
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: your_secure_password
+    ports:
+      - "8123:8123"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    restart: unless-stopped
+
+  server:
+    build:
+      context: ./server
+    container_name: conspulse-server
+    environment:
+      API_SECRET: super-secret-api-key
+      CLICKHOUSE_HOST: http://clickhouse:8123
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: your_secure_password
+      CLICKHOUSE_DATABASE: default
+      PORT: 3000
+      RPC_URL: https://polygon-amoy-heimdall-rpc.publicnode.com/
+    ports:
+      - "3000:3000"
+    depends_on:
+      - clickhouse
+    restart: unless-stopped
+    command: npm run dev
+
+  dashboard:
+    build:
+      context: ./dashboard
+    container_name: conspulse-dashboard
+    environment:
+      NEXT_PUBLIC_RPC_URL: https://polygon-amoy-heimdall-rpc.publicnode.com/
+      NEXT_PUBLIC_NETWORK_NAME: Polygon Localnet
+      NEXT_PUBLIC_SCRIPT_API_URL: http://iavlviewer:8080
+      NEXT_PUBLIC_WEBSOCKET: wss://polygon-amoy-heimdall-rpc.publicnode.com/
+      NEXT_PUBLIC_METRICS_BACKEND_URL: http://server:3000/api/
+      NEXT_PUBLIC_EXPLORER_URL: https://polygonscan.com/address/
+    ports:
+      - "3001:3000"
+    depends_on:
+      - server
+    restart: unless-stopped
+    command: sh -c "npm install && npm run build && npm start"
+
+  iavlviewer:
+    image: golang:1.21
+    container_name: conspulse-iavlviewer
+    working_dir: /app
+    volumes:
+      - ./scripts/iavlviewer:/app
+    command: sh -c "go build -o iavlviewer . && ./iavlviewer --server --port=8080"
+    ports:
+      - "8080:8080"
+
+volumes:
+  clickhouse_data:
