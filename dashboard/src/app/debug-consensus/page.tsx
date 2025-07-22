@@ -24,7 +24,6 @@ export default function DebugConsensusPage() {
   const [output, setOutput] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const pathname = usePathname();
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
   function detectSourceType(val: string) {
@@ -52,7 +51,6 @@ export default function DebugConsensusPage() {
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      console.log(data);
       setOutput(data);
     } catch (err: any) {
       setError(err.message || "Unknown error");

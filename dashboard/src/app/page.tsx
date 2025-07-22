@@ -120,14 +120,23 @@ export default function NetstatsPage() {
 
 
 
+  const sortKeyMap: Record<string, keyof Stats> = {
+    votingpower: 'votingPower',
+    earliestheight: 'earliestBlockHeight',
+    latestheight: 'latestBlockHeight',
+  };
+
   const handleSort = (key: string) => {
-    if (sortBy === key) {
+    const normalizedKey = sortKeyMap[key.toLowerCase()] || key;
+
+    if (sortBy === normalizedKey) {
       setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
-      setSortBy(key);
+      setSortBy(normalizedKey);
       setSortDirection('asc');
     }
   };
+
 
 
   const [favoriteNodes, setFavoriteNodes] = useState<Set<string>>(new Set());
@@ -155,13 +164,6 @@ export default function NetstatsPage() {
 
         const aVal = a[sortBy as keyof Stats];
         const bVal = b[sortBy as keyof Stats];
-
-        if (aVal == null) return 1;
-        if (bVal == null) return -1;
-
-        if (typeof aVal === 'number' && typeof bVal === 'number') {
-          return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
-        }
 
         return sortDirection === 'asc'
           ? String(aVal).localeCompare(String(bVal))
@@ -424,7 +426,7 @@ export default function NetstatsPage() {
     {
       title: "Voting Power",
       description: "The voting power (stake) of the current block proposer",
-      value: parseInt(proposerObj?.voting_power)?.toLocaleString() ?? "—",
+      value: parseInt(proposerObj?.voting_power)?.toLocaleString() ?? "0",
       icon: Shield,
       accent: "amber",
     },

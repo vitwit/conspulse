@@ -47,7 +47,6 @@ export const registerNode = async (
             })
         }
 
-        console.log(nodeInfo)
         await db.registerNode(nodeInfo);
         return res.status(200).json(nodeInfo);
     } catch (err) {

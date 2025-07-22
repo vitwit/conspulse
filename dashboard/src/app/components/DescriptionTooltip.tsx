@@ -12,7 +12,7 @@ type Props = {
 const DescriptionTooltip: React.FC<Props> = ({ title, description, className }) => {
     return (
         <span
-            className={`text-sm font-semibold text-white/90 flex items-center gap-1 ${className}`}
+            className={`text-sm text-white/90 flex items-center gap-1 ${className}`}
         >
             {title}
             <span className="relative group">

@@ -32,8 +32,14 @@ interface Props {
     rowVariants: any;
     updatedRows: any;
     favoriteNodes: Set<string>;
-  toggleFavorite: (address: string) => void;
+    toggleFavorite: (address: string) => void;
 }
+
+const sortKeyMap: Record<string, keyof Stats> = {
+    votingpower: 'votingPower',
+    earliestheight: 'earliestBlockHeight',
+    latestheight: 'latestBlockHeight',
+};
 
 const PeersTableTab: React.FC<Props> = ({
     nodes,
@@ -48,7 +54,7 @@ const PeersTableTab: React.FC<Props> = ({
     toggleFavorite,
 }) => {
     const headers = [
-          '★',
+        '★',
         '#',
         'Moniker',
         'Node ID',
@@ -73,7 +79,9 @@ const PeersTableTab: React.FC<Props> = ({
                     <tr>
                         {headers.map((title, index) => {
                             const key = title.toLowerCase().replace(/ /g, '');
-                            const isSorted = sortBy === key;
+
+                            const normalizedKey = sortKeyMap[key] || key;
+                            const isSorted = sortBy === normalizedKey;
 
                             return (
                                 <th
@@ -83,7 +91,7 @@ const PeersTableTab: React.FC<Props> = ({
                                 >
                                     <div className="flex items-center gap-1">
                                         <span>{title}</span>
-                                        {title !== "#" && (
+                                        {(title !== "#" && title !== "★") && (
                                             <span className="flex flex-col leading-[0.8] text-[10px] ml-0.5">
                                                 <span className={`${isSorted && sortDirection === 'asc' ? 'text-white' : 'text-gray-500'}`}>
                                                     ▲
@@ -114,26 +122,30 @@ const PeersTableTab: React.FC<Props> = ({
                                 return (
                                     <motion.tr
                                         key={node.address || idx}
-                                    layout
+                                        layout
                                         initial="hidden"
-                                    animate="visible"
-                                    exit="exit"
-                                    variants={rowVariants}
-                                    transition={{ duration: 0.3 }}
-                                    className={`hover:bg-[#2e3440] border-b border-[#2a2f3a] ${
-    updatedRows.has(node.address) ? 'animate-fadeGreen' : ''
-  }`}
+                                        animate="visible"
+                                        exit="exit"
+                                        variants={rowVariants}
+                                        transition={{ duration: 0.3 }}
+
+                                        className={`
+                                            hover:bg-[#2e3440]
+                                            border-b border-[#2a2f3a]
+                                            ${updatedRows.has(node.address) ? 'animate-fadeGreen' : ''}
+                                            ${favoriteNodes.has(node.address) ? 'bg-[#3b4252]' : ''}
+                                        `}
                                     >
                                         {[
-                                              <button
-    onClick={() => toggleFavorite(node.address)}
-    className="text-xl text-yellow-400 focus:outline-none transition-transform"
-    title={favoriteNodes.has(node.address) ? 'Unfavorite' : 'Favorite'}
-  >
-    {favoriteNodes.has(node.address) ? '★' : '☆'}
-  </button>,
+                                            <button
+                                                onClick={() => toggleFavorite(node.address)}
+                                                className="text-xl text-yellow-400 focus:outline-none transition-transform"
+                                                title={favoriteNodes.has(node.address) ? 'Unfavorite' : 'Favorite'}
+                                            >
+                                                {favoriteNodes.has(node.address) ? '★' : '☆'}
+                                            </button>,
                                             idx + 1,
-                                            <Moniker name={node.moniker} value={`0x${node.address}`} explorerUrl='http://localhost:1317/' />,
+                                            <Moniker name={node.moniker} value={`0x${node.address}`} explorerUrl={process.env.NEXT_PUBLIC_EXPLORER_URL || ""} />,
                                             <ShortName value={node.nodeID} maxLength={7} />,
                                             node.earliestBlockHeight.toLocaleString(),
                                             node.latestBlockHeight.toLocaleString(),
@@ -141,7 +153,7 @@ const PeersTableTab: React.FC<Props> = ({
                                             `${Math.floor((Date.now() - node.blockTime * 1000) / 1000)}s ago`,
                                             node.isSyncing ? 'Syncing' : 'Yes',
                                             node.network,
-                                            node.votingPower,
+                                            node.votingPower > 0 ? node.votingPower : 0,
                                             node.peers.length || 0,
                                             node.version,
                                             node.os,
@@ -151,12 +163,12 @@ const PeersTableTab: React.FC<Props> = ({
                                             <td key={i} className="px-4 py-2 font-mono text-sm text-gray-100 whitespace-nowrap">
                                                 <motion.div
                                                     initial="initial"
-                                                animate="animate"
-                                                exit="exit"
-                                                variants={rowVariants}
-                                                transition={{ duration: 0.3 }}
+                                                    animate="animate"
+                                                    exit="exit"
+                                                    variants={rowVariants}
+                                                    transition={{ duration: 0.3 }}
                                                 >
-                                                    {value || '—'}
+                                                    {value}
                                                 </motion.div>
                                             </td>
                                         ))}
