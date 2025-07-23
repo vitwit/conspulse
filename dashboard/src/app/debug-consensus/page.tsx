@@ -64,14 +64,14 @@ export default function DebugConsensusPage() {
       <SupportUS />
       <Navbar shrink={false} />
 
-      <main className="flex-1 mt-4">
-        <section className="p-4 sm:p-8 max-w-5xl mx-auto bg-[#1a1e24] rounded-xl shadow-lg mb-8 border border-[#2a2f3a]">
-          <h1 className="text-2xl font-bold mb-2 text-blue-400">Debug Consensus / AppHash Mismatch</h1>
+      <main className="flex-1 mt-4 px-12">
+        <section className="p-4 sm:p-8 mx-auto bg-[#1a1e24] rounded-xl shadow-lg mb-8 border border-[#2a2f3a]">
+          <h1 className="text-2xl font-bold mb-2 text-green-500">Debug Consensus / AppHash Mismatch</h1>
           <p className="mb-6 text-gray-400 whitespace-pre-line">{description}</p>
 
           <button
             type="button"
-            className="mb-4 bg-[#2a2f3a] hover:bg-[#394150] text-white px-4 py-2 rounded font-semibold transition border border-[#3a3f4a]"
+            className="mb-4 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold transition border border-green-700"
             onClick={() => {
               setSource1("https://raw.githubusercontent.com/vitwit/conspulse/refs/heads/temp/heimdallv2backup.zip");
               setSource2("https://raw.githubusercontent.com/vitwit/conspulse/refs/heads/temp/heimdallv2.backup.zip");
@@ -82,32 +82,32 @@ export default function DebugConsensusPage() {
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-6">
             <div className="flex flex-col gap-2">
-              <label className="font-semibold">Source 1</label>
+              <label className="font-semibold text-gray-400">Source 1</label>
               <input
                 type="text"
                 value={source1}
                 onChange={(e) => setSource1(e.target.value)}
                 placeholder="Path or URL to data or .zip file"
-                className="bg-[#0e1014] border border-[#3a3f4a] text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 placeholder:text-gray-500 w-full"
+                className="bg-[#0e1014] border border-[#3a3f4a] text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600 placeholder:text-gray-500 w-full"
                 required
               />
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="font-semibold">Source 2</label>
+              <label className="font-semibold text-gray-400">Source 2</label>
               <input
                 type="text"
                 value={source2}
                 onChange={(e) => setSource2(e.target.value)}
                 placeholder="Path or URL to data or .zip file"
-                className="bg-[#0e1014] border border-[#3a3f4a] text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 placeholder:text-gray-500 w-full"
+                className="bg-[#0e1014] border border-[#3a3f4a] text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600 placeholder:text-gray-500 w-full"
                 required
               />
             </div>
 
             <div className="flex flex-wrap items-center gap-6">
               <div className="flex items-center gap-2">
-                <label className="font-semibold">Max Diffs Per Store</label>
+                <label className="font-semibold text-gray-400">Max Diffs Per Store</label>
                 <input
                   type="number"
                   min={1}
@@ -116,30 +116,30 @@ export default function DebugConsensusPage() {
                   onChange={(e) =>
                     setOptions({ ...options, max_diffs_per_store: Number(e.target.value) })
                   }
-                  className="bg-[#0e1014] border border-[#3a3f4a] text-white px-3 py-2 rounded-lg w-20 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  className="bg-[#0e1014] border border-[#3a3f4a] text-white px-3 py-2 rounded-lg w-20 focus:outline-none focus:ring-2 focus:ring-green-600"
                 />
               </div>
 
-              <label className="inline-flex items-center gap-2 text-sm">
+              <label className="inline-flex items-center gap-2 text-sm text-gray-300">
                 <input
                   type="checkbox"
                   checked={options.show_matching_stores}
                   onChange={(e) =>
                     setOptions({ ...options, show_matching_stores: e.target.checked })
                   }
-                  className="h-5 w-5 text-blue-500 rounded focus:ring-blue-500 border border-gray-600 bg-[#1a1e24]"
+                  className="h-5 w-5 accent-green-500 focus:ring-green-500 border border-gray-600 bg-[#1a1e24]"
                 />
                 Show Matching Stores
               </label>
 
-              <label className="inline-flex items-center gap-2 text-sm">
+              <label className="inline-flex items-center gap-2 text-sm text-gray-300">
                 <input
                   type="checkbox"
                   checked={options.detailed_output}
                   onChange={(e) =>
                     setOptions({ ...options, detailed_output: e.target.checked })
                   }
-                  className="h-5 w-5 text-blue-500 rounded focus:ring-blue-500 border border-gray-600 bg-[#1a1e24]"
+                  className="h-5 w-5 accent-green-500 focus:ring-green-500 border border-gray-600 bg-[#1a1e24]"
                 />
                 Detailed Output
               </label>
@@ -148,7 +148,7 @@ export default function DebugConsensusPage() {
             <div className="flex justify-center">
               <button
                 type="submit"
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50"
+                className="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition disabled:opacity-50"
                 disabled={loading}
               >
                 {loading ? "Debugging..." : "Debug State"}
@@ -158,17 +158,18 @@ export default function DebugConsensusPage() {
 
           {error && <div className="bg-red-800 text-red-100 p-3 rounded mt-4">{error}</div>}
 
+          {/* output rendering below remains unchanged */}
           {output && (
             <div className="mt-8">
-              <h2 className="text-2xl font-bold mb-6 text-blue-400">Comparison Output</h2>
+              <h2 className="text-2xl font-bold mb-6 text-green-400">Comparison Output</h2>
 
               {/* Summary Boxes */}
               <div className="mb-4 grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
-                <div className="bg-[#1f2a36] text-blue-400 border border-blue-700 rounded p-2 flex flex-col items-center">
+                <div className="bg-[#1f2a36] text-green-400 border border-green-700 rounded p-2 flex flex-col items-center">
                   <span className="text-xs text-gray-400">Total Stores</span>
                   <span className="font-bold">{output.summary?.total_stores}</span>
                 </div>
-                <div className="bg-[#1d2a1f] text-green-400 border border-green-700 rounded p-2 flex flex-col items-center">
+                <div className="bg-[#1d2a1f] text-green-300 border border-green-700 rounded p-2 flex flex-col items-center">
                   <span className="text-xs text-gray-400">Matching</span>
                   <span className="font-bold">{output.summary?.matching_stores}</span>
                 </div>
@@ -187,12 +188,12 @@ export default function DebugConsensusPage() {
                 <table className="min-w-full text-sm border border-[#3a3f4a] rounded overflow-hidden">
                   <thead>
                     <tr className="bg-[#2a2f3a] text-gray-200">
-                      <th className="px-3 py-2 text-left font-bold">Store</th>
-                      <th className="px-3 py-2 text-left font-bold">Status</th>
-                      <th className="px-3 py-2 text-left font-bold">Hash 1</th>
-                      <th className="px-3 py-2 text-left font-bold">Hash 2</th>
-                      <th className="px-3 py-2 text-left font-bold">Type 1</th>
-                      <th className="px-3 py-2 text-left font-bold">Type 2</th>
+                      <th className="px-3 py-2 text-left font-bold hover:text-zinc-400 transition text-zinc-500/90">Store</th>
+                      <th className="px-3 py-2 text-left font-bold hover:text-zinc-400 transition text-zinc-500/90">Status</th>
+                      <th className="px-3 py-2 text-left font-bold hover:text-zinc-400 transition text-zinc-500/90">Hash 1</th>
+                      <th className="px-3 py-2 text-left font-bold hover:text-zinc-400 transition text-zinc-500/90">Hash 2</th>
+                      <th className="px-3 py-2 text-left font-bold hover:text-zinc-400 transition text-zinc-500/90">Type 1</th>
+                      <th className="px-3 py-2 text-left font-bold hover:text-zinc-400 transition text-zinc-500/90">Type 2</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -288,7 +289,7 @@ export default function DebugConsensusPage() {
                 </table>
               </div>
 
-              {/* Metadata */}
+              {/* Metadata section */}
               <div className="mt-6 text-xs text-gray-400 border-t border-[#2a2f3a] pt-4">
                 <div>
                   Source1 Version:{' '}

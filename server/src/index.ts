@@ -54,18 +54,32 @@ export const server = createServer(app);
 
 // CRON section for cleanup
 
-var pruning = false
+declare global {
+    var __cleanupJobScheduled: boolean | undefined;
+}
 
-// Schedule task to run every 3 minutes
-cron.schedule('*/3 * * * *', async () => {
+if (!global.__cleanupJobScheduled) {
+    global.__cleanupJobScheduled = true;
 
-    if (pruning) {
-        logger.info('Last pruning job is not completed')
-        return
-    }
+    let pruning = false;
 
-    pruning = true;
-    logger.info(`Pruning records job started`);
-    await db.cleanOldRecords();
-    pruning = false
-});
+    cron.schedule('*/3 * * * *', async () => {
+        if (pruning) {
+            logger.info('Last pruning job is not completed');
+            return;
+        }
+
+        pruning = true;
+        logger.info(`[cron] Pruning records job started by PID: ${process.pid}`);
+
+        try {
+            await db.cleanOldRecords();
+        } catch (err) {
+            logger.error(`Error during cleanup: ${err}`);
+        }
+
+        pruning = false;
+    });
+
+    console.log(`[cron] Cleanup job scheduled by PID: ${process.pid}`);
+}

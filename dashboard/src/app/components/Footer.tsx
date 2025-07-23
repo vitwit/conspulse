@@ -36,7 +36,7 @@ export default function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Email"
-              className="hover:text-cyan-400 transition-transform hover:scale-110"
+              className="hover:text-green-600 transition-transform hover:scale-110"
             >
               <FontAwesomeIcon icon={faEnvelope} size="lg" />
             </a>
@@ -45,7 +45,7 @@ export default function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Telegram"
-              className="hover:text-blue-400 transition-transform hover:scale-110"
+              className="hover:text-green-600  transition-transform hover:scale-110"
             >
               <FontAwesomeIcon icon={faTelegram} size="lg" />
             </a>
@@ -54,7 +54,7 @@ export default function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Twitter"
-              className="hover:text-blue-500 transition-transform hover:scale-110"
+              className="hover:text-green-600  transition-transform hover:scale-110"
             >
               <FontAwesomeIcon icon={faTwitter} size="lg" />
             </a>
@@ -63,7 +63,7 @@ export default function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="GitHub"
-              className="hover:text-gray-100 transition-transform hover:scale-110"
+              className="hover:text-green-600  transition-transform hover:scale-110"
             >
               <FontAwesomeIcon icon={faGithub} size="lg" />
             </a>

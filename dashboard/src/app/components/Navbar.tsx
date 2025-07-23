@@ -55,8 +55,8 @@ export default function Navbar(props: { shrink: boolean }) {
                   key={item.key}
                   href={item.href}
                   className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${isActive
-                      ? "bg-cyan-700 text-white"
-                      : "text-gray-200 hover:text-white hover:bg-[#1f2430]"
+                      ? "underline text-green-500/90 hover:bg-green-500/10"
+                      : "text-gray-200 hover:text-white hover:bg-green-500/10"
                     }`}
                 >
                   {item.label}

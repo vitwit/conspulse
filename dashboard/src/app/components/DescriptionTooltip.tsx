@@ -11,7 +11,7 @@ type Props = {
 
 const DescriptionTooltip: React.FC<Props> = ({ title, description, className }) => {
     return (
-        <span className={`text-sm text-white/90 flex items-center gap-1 ${className}`}>
+        <span className={`text-sm text-zinc-500/90 hover:text-zinc-500 flex items-center gap-1 ${className}`}>
             {title}
             <span className="relative group">
                 <Info className="w-4 h-4 text-gray-400 group-hover:text-white cursor-pointer transition-colors" />

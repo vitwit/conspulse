@@ -74,8 +74,8 @@ const PeersTableTab: React.FC<Props> = ({
 
     return (
         <div className="overflow-x-auto mb-8 scrollbar-hide">
-            <table className="min-w-full text-sm text-left text-gray-300 bg-[#1a1e24] border border-[#2a2f3a] rounded-lg shadow-md">
-                <thead className="bg-[#2a2f3a] text-cyan-300 text-xs uppercase tracking-wider">
+            <table className="min-w-full text-sm text-left rounded-lg shadow-md">
+                <thead className="bg-[#2a2f3a] text-xs uppercase tracking-wider">
                     <tr>
                         {headers.map((title, index) => {
                             const key = title.toLowerCase().replace(/ /g, '');
@@ -87,16 +87,16 @@ const PeersTableTab: React.FC<Props> = ({
                                 <th
                                     key={index}
                                     onClick={() => handleSort(key)}
-                                    className="cursor-pointer px-4 py-3 whitespace-nowrap hover:text-white transition text-teal-400 select-none"
+                                    className="cursor-pointer px-4 py-3 whitespace-nowrap hover:text-zinc-400 transition text-zinc-500/90 select-none"
                                 >
                                     <div className="flex items-center gap-1">
                                         <span>{title}</span>
                                         {(title !== "#" && title !== "★") && (
                                             <span className="flex flex-col leading-[0.8] text-[10px] ml-0.5">
-                                                <span className={`${isSorted && sortDirection === 'asc' ? 'text-white' : 'text-gray-500'}`}>
+                                                <span className={`${isSorted && sortDirection === 'asc' ? 'text-blue-500/80' : 'text-zinc-500/90'}`}>
                                                     ▲
                                                 </span>
-                                                <span className={`${isSorted && sortDirection === 'desc' ? 'text-white' : 'text-gray-500'}`}>
+                                                <span className={`${isSorted && sortDirection === 'desc' ? 'text-blue-500/80' : 'text-zinc-500/90'}`}>
                                                     ▼
                                                 </span>
                                             </span>
@@ -160,7 +160,7 @@ const PeersTableTab: React.FC<Props> = ({
                                             node.goVersion,
                                             formatLatency(node.latency),
                                         ].map((value, i) => (
-                                            <td key={i} className="px-4 py-2 font-mono text-sm text-gray-100 whitespace-nowrap">
+                                            <td key={i} className="px-4 py-4 font-mono text-sm text-gray-100 whitespace-nowrap">
                                                 <motion.div
                                                     initial="initial"
                                                     animate="animate"

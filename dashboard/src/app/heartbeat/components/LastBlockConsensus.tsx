@@ -32,11 +32,11 @@ const LastBlockConsensusTab: React.FC<Props> = ({
     return (
         <div className="overflow-x-auto scrollbar-hide">
             <table className="min-w-full text-sm text-left text-gray-300 bg-[#1a1e24] border border-[#2a2f3a] rounded-lg shadow-md">
-                <thead className="bg-[#2a2f3a] text-cyan-300 text-xs uppercase tracking-wider">
+                <thead className="bg-[#2a2f3a] text-xs uppercase tracking-wider">
                     <tr>
                         {['#', 'Validator Address', 'Voted', 'Vote Time', 'Voting Power', 'Voting Power %', 'Vote String'].map(
                             (label, i) => (
-                                <th key={i} className="px-4 py-3 whitespace-nowrap">
+                                <th key={i} className="px-4 py-3 whitespace-nowrap hover:text-zinc-400 transition text-zinc-500/90">
                                     {label}
                                 </th>
                             )

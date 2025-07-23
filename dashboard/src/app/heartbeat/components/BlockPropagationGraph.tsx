@@ -32,8 +32,9 @@ export function BlockPropagationGraph({
         {
           label: "Block Count",
           data: [],
-          backgroundColor: "rgba(75, 192, 192, 0.6)",
-          borderColor: "rgba(75, 192, 192, 1)",
+          backgroundColor: "rgba(0, 255, 136, 0.7)", // 70% opacity
+          borderColor: "rgba(0, 255, 136, 1)",       // fully opaque
+
           borderWidth: 1,
         },
       ],
@@ -51,8 +52,8 @@ export function BlockPropagationGraph({
       {
         label: "Block Count",
         data: values,
-        backgroundColor: "rgba(75, 192, 192, 0.6)",
-        borderColor: "rgba(75, 192, 192, 1)",
+        backgroundColor: "rgba(0, 255, 136, 0.7)", // 70% opacity
+        borderColor: "rgba(0, 255, 136, 1)",       // fully opaque
         borderWidth: 1,
       },
     ],

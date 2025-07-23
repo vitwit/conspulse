@@ -2,8 +2,8 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-import { NodeStats } from "./lib/api";
 import throttle from "lodash/throttle";
+import clsx from "clsx";
 
 import dynamic from "next/dynamic";
 
@@ -20,6 +20,8 @@ import {
   Vote,
   User,
   Info,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { BlockPropagationGraph } from "./heartbeat/components/BlockPropagationGraph";
 import BarChart from "./heartbeat/components/Barchart";
@@ -426,7 +428,7 @@ export default function NetstatsPage() {
     {
       title: "Voting Power",
       description: "The voting power (stake) of the current block proposer",
-      value: (proposerObj && proposerObj.voting_power ? parseInt(proposerObj?.voting_power)?.toLocaleString(): "0") ?? "0",
+      value: (proposerObj && proposerObj.voting_power ? parseInt(proposerObj?.voting_power)?.toLocaleString() : "0") ?? "0",
       icon: Shield,
       accent: "amber",
     },
@@ -437,6 +439,10 @@ export default function NetstatsPage() {
     { key: "versions", label: "Node Versions" },
     { key: "consensus", label: "Last Block Consensus" },
   ]
+
+  const [visible, setVisible] = useState(true);
+
+  const toggleVisibility = () => setVisible((prev) => !prev);
 
 
 
@@ -464,107 +470,128 @@ export default function NetstatsPage() {
           />
 
           <div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4 p-4 bg-[#0e1014] text-white font-sans">
-              {metrics.map(({ title, value, icon: Icon, accent, description }) => (
+            {/* <div className="bg-[#1a1e24] rounded-lg p-4 pb-8 mt-4 border border-[#2a2f3a] relative"> */}
+              {/* Toggle Icon */}
+              {/* <button
+                onClick={toggleVisibility}
+                className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors"
+                aria-label="Toggle visibility"
+              >
+                {visible ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+              </button>
+            </div> */}
+
+            {/* Toggle Content */}
+            <div
+              id="x"
+              className={clsx(
+                "transition-all duration-500 overflow-hidden",
+                visible ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
+              )}
+            >
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4 py-4 bg-[#0e1014] text-white font-sans">
+                {metrics.map(({ title, value, icon: Icon, accent, description }) => (
+                  <div
+                    key={title}
+                    className="bg-[#1a1e24] rounded-lg px-5 py-4 border border-[#2a2f3a] hover:border-cyan-400 transition shadow-sm"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+
+                      <DescriptionTooltip title={title} description={description || "-"} />
+
+                      <Icon className={`w-6 h-6 ${colorClasses[accent]}`} />
+                    </div>
+                    <div
+                      className={`text-3xl font-mono font-bold ${colorClasses[accent]} leading-tight truncate`}
+                    >
+                      {value}
+                    </div>
+                  </div>
+                ))}
+
+
                 <div
-                  key={title}
-                  className="bg-[#1a1e24] rounded-lg px-5 py-4 border border-[#2a2f3a] hover:border-cyan-400 transition shadow-sm"
+                  key="bit-array"
+                  className="bg-[#1a1e24] md:col-span-4 col-span-2 rounded-lg px-5 py-4 border border-[#2a2f3a] hover:border-cyan-400 transition shadow-sm"
                 >
                   <div className="flex items-center justify-between mb-2">
+                    <DescriptionTooltip
 
-                    <DescriptionTooltip title={title} description={description || "-"} />
-
-                    <Icon className={`w-6 h-6 ${colorClasses[accent]}`} />
+                      title="Block Votes"
+                      description="Votes cast by validators for the current block."
+                    />
+                    <User className={`w-6 h-6 text-lime-400`} />
                   </div>
                   <div
-                    className={`text-3xl font-mono font-bold ${colorClasses[accent]} leading-tight truncate`}
+                    className={`text-3xl font-mono font-bold text-lime-400 leading-tight truncate`}
+                    title="bit-array"
                   >
-                    {value}
+                    {lastCommitBitArray && (
+                      <BitArrayCandles
+                        bitArray={lastCommitBitArray}
+                        validators={validators}
+                      />
+                    )}
                   </div>
                 </div>
-              ))}
 
 
-              <div
-                key="bit-array"
-                className="bg-[#1a1e24] md:col-span-3 col-span-2 rounded-lg px-5 py-4 border border-[#2a2f3a] hover:border-cyan-400 transition shadow-sm"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <DescriptionTooltip
+              </div>
 
-                    title="Block Votes"
-                    description="Votes cast by validators for the current block."
-                  />
-                  <User className={`w-6 h-6 text-lime-400`} />
-                </div>
-                <div
-                  className={`text-3xl font-mono font-bold text-lime-400 leading-tight truncate`}
-                  title="bit-array"
-                >
-                  {lastCommitBitArray && (
-                    <BitArrayCandles
-                      bitArray={lastCommitBitArray}
-                      validators={validators}
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 bg-[#0e1014] text-white font-sans">
+                <div className="bg-[#1a1e24] rounded-lg p-4 shadow-sm border border-[#2a2f3a]">
+
+                  <div className="flex items-center justify-between mb-2">
+                    <DescriptionTooltip
+                      description="Distribution of block receive times after proposal."
+                      title="Block Propagation"
                     />
-                  )}
+                  </div>
+                  <BlockPropagationGraph data={stats?.blockPropagation} />
                 </div>
-              </div>
 
-
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 gap-4 px-4 pb-4 bg-[#0e1014] text-white font-sans">
-              <div className="bg-[#1a1e24] rounded-lg p-4 shadow-sm border border-[#2a2f3a]">
-
-                <div className="flex items-center justify-between mb-2">
+                <div className="bg-[#1a1e24] rounded-lg p-4 shadow-sm border border-[#2a2f3a]">
                   <DescriptionTooltip
-                    description="Distribution of block receive times after proposal."
-                    title="Block Propagation"
+                    title="Block Time"
+                    description="Time taken to produce each block at every height."
+                  />
+                  <BarChart
+                    data={stats?.blocksWindow?.map(stat => (stat.blockTime / 1000).toFixed(2)) || [0, 0, 0]}
+                    labels={stats?.blocksWindow?.map(stat => stat.blockNumber) || [0, 0, 0]}
+                    label="Block time"
+                    color="#00FF88B2"
                   />
                 </div>
-                <BlockPropagationGraph data={stats?.blockPropagation} />
+
+                <div className="bg-[#1a1e24] rounded-lg p-4 shadow-sm border border-[#2a2f3a]">
+                  <DescriptionTooltip
+                    title="Transactions"
+                    description="Number of transactions included in each block."
+                  />
+                  <BarChart
+                    data={stats?.blocksWindow?.map(stat => stat.txnCount) || [0, 0, 0]}
+                    labels={stats?.blocksWindow?.map(stat => stat.blockNumber) || [0, 0, 0]}
+                    label="Transactions"
+                    color="#00FF88B2"
+                    showIntegersOnly={true}
+                  />
+                </div>
+
+                <div className="bg-[#1a1e24] rounded-lg p-4 shadow-sm border border-[#2a2f3a]">
+                  <DescriptionTooltip
+                    title="Nodes Map"
+                    description="Geographical distribution of network nodes."
+                  />
+                  <NodeMap data={nodesLocation} />
+                </div>
               </div>
 
-              <div className="bg-[#1a1e24] rounded-lg p-4 shadow-sm border border-[#2a2f3a]">
-                <DescriptionTooltip
-                  title="Block Time"
-                  description="Time taken to produce each block at every height."
-                />
-                <BarChart
-                  data={stats?.blocksWindow?.map(stat => (stat.blockTime / 1000).toFixed(2)) || [0, 0, 0]}
-                  labels={stats?.blocksWindow?.map(stat => stat.blockNumber) || [0, 0, 0]}
-                  label="Block time"
-                  color="#4C78A8"
-                />
-              </div>
-
-              <div className="bg-[#1a1e24] rounded-lg p-4 shadow-sm border border-[#2a2f3a]">
-                <DescriptionTooltip
-                  title="Transactions"
-                  description="Number of transactions included in each block."
-                />
-                <BarChart
-                  data={stats?.blocksWindow?.map(stat => stat.txnCount) || [0, 0, 0]}
-                  labels={stats?.blocksWindow?.map(stat => stat.blockNumber) || [0, 0, 0]}
-                  label="Transactions"
-                  color="#4C78A8"
-                  showIntegersOnly={true}
-                />
-              </div>
-
-              <div className="bg-[#1a1e24] rounded-lg p-4 shadow-sm border border-[#2a2f3a]">
-                <DescriptionTooltip
-                  title="Nodes Map"
-                  description="Geographical distribution of network nodes."
-                />
-                <NodeMap data={nodesLocation} />
-              </div>
             </div>
-
           </div>
 
+
           {/* Tabs for Peers and Last Block Consensus */}
-          <div className="sticky top-0 z-10 bg-[#1a1e24] flex gap-2 border-b border-[#2a2f3a] px-4 py-2">
+          <div className="sticky top-0 z-10 mt-4 bg-[#1a1e24] flex gap-2 border-b border-[#2a2f3a] px-4 py-2">
             {
               tabs.map((tab) => (
                 <button
@@ -572,7 +599,7 @@ export default function NetstatsPage() {
                   onClick={() => setActiveTab(tab.key)}
                   className={`px-4 py-2 text-sm font-semibold rounded-t-md transition-colors duration-200
         ${activeTab === tab.key
-                      ? "bg-[#0e1014] text-cyan-400 border-b-2 border-cyan-400 hover:cursor-pointer "
+                      ? "bg-[#0e1014] text-green-400 border-b-2 border-green-400 hover:cursor-pointer "
                       : "bg-[#2a2f3a] text-gray-400 hover:text-white hover:bg-[#2f3542] hover:cursor-pointer"
                     }`}
                 >

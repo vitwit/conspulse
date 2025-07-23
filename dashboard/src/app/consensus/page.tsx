@@ -412,7 +412,7 @@ export default function Home() {
                     className="bg-[#1a1e24] rounded-lg px-5 py-4 border border-[#2a2f3a] hover:border-cyan-400 transition shadow-sm"
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-medium text-teal-400">{label}</h3>
+                      <h3 className="text-sm font-medium text-zinc-500/90">{label}</h3>
                     </div>
                     <div
                       className={`text-2xl font-mono font-bold leading-tight truncate ${colorMap[accent]}`}
