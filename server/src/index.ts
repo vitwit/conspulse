@@ -54,9 +54,18 @@ export const server = createServer(app);
 
 // CRON section for cleanup
 
-// Schedule task to run every 5 minutes
-cron.schedule('*/5 * * * *', async () => {
+var pruning = false
+
+// Schedule task to run every 3 minutes
+cron.schedule('*/3 * * * *', async () => {
+
+    if (pruning) {
+        logger.info('Last pruning job is not completed')
+        return
+    }
+
+    pruning = true;
     logger.info(`Pruning records job started`);
     await db.cleanOldRecords();
-
+    pruning = false
 });

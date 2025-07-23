@@ -12,7 +12,7 @@ const NETWORK_NAME = process.env.NEXT_PUBLIC_NETWORK_NAME || "the network";
 export default function Footer() {
   return (
     <footer className="w-full bg-[#13161c] border-t border-[#1f232b] px-4 pt-10 pb-6 text-sm text-gray-400">
-      <div className="max-w-6xl mx-auto w-full flex flex-col sm:flex-row justify-between gap-10">
+      <div className="mx-auto w-full flex flex-col sm:flex-row justify-between gap-10 pl-6 pr-6">
         {/* Left: About */}
         <div className="flex-1 min-w-[240px]">
           <div className="flex items-center mb-3">

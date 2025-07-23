@@ -284,7 +284,7 @@ ORDER BY blockTime DESC;
     }
 
     async cleanOldRecords(): Promise<void> {
-        // Fixed query using row_number() to find the 5000th latest height per address
+        // Fixed query using row_number() to find the 500th latest height per address
         const cutoffQuery = `
         SELECT
             address,
@@ -296,7 +296,7 @@ ORDER BY blockTime DESC;
                 row_number() OVER (PARTITION BY address ORDER BY height DESC) AS rn
             FROM node_stats
         )
-        WHERE rn = 5000
+        WHERE rn = 500
         GROUP BY address
     `;
 
