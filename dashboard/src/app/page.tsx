@@ -426,7 +426,7 @@ export default function NetstatsPage() {
     {
       title: "Voting Power",
       description: "The voting power (stake) of the current block proposer",
-      value: parseInt(proposerObj?.voting_power)?.toLocaleString() ?? "0",
+      value: (proposerObj && proposerObj.voting_power ? parseInt(proposerObj?.voting_power)?.toLocaleString(): "0") ?? "0",
       icon: Shield,
       accent: "amber",
     },
