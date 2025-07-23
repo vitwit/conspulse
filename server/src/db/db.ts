@@ -285,56 +285,58 @@ ORDER BY blockTime DESC;
 
     async cleanOldRecords(): Promise<void> {
         const cutoffQuery = `
-        WITH ranked AS (
-            SELECT
-                address,
-                height,
-                row_number() OVER (PARTITION BY address ORDER BY height DESC) AS rn
-            FROM node_stats
-        )
         SELECT
             address,
-            MIN(height) AS minHeightToKeep
-        FROM ranked
-        WHERE rn <= 5000
+            arrayElement(groupArray(height ORDER BY height DESC), 5000) AS minHeightToKeep
+        FROM node_stats
         GROUP BY address
+        HAVING minHeightToKeep IS NOT NULL
     `;
 
         try {
             logger.info(`Pruning records job started`);
 
+            // Step 1: Fetch cutoff heights per address
             const result: CutoffResult[] = await this.client
-                .query({ query: cutoffQuery, format: 'JSONEachRow' })
+                .query({
+                    query: cutoffQuery,
+                    format: 'JSONEachRow',
+
+                    clickhouse_settings: {
+                        max_memory_usage: '6000000000', // limit to 6 GiB just to be safe
+                    }
+                })
                 .then((res) => res.json());
 
             const batchSize = 50;
 
+            // Step 2: Delete records in smaller batches (1 deletion per address)
             for (let i = 0; i < result.length; i += batchSize) {
                 const batch = result.slice(i, i + batchSize);
 
-                const conditions = batch.map(({ address, minHeightToKeep }) => {
-                    logger.info(`Preparing cleanup for ${address} below height ${minHeightToKeep}`);
-                    return `(address = '${address}' AND height < ${minHeightToKeep})`;
-                }).join(' OR ');
+                logger.info(`Processing batch ${i / batchSize + 1} of ${Math.ceil(result.length / batchSize)}`);
 
-                const deleteQuery = `
-                ALTER TABLE node_stats
-                DELETE WHERE ${conditions}
-            `;
+                for (const { address, minHeightToKeep } of batch) {
+                    const deleteQuery = `
+                    ALTER TABLE node_stats
+                    DELETE WHERE address = '${address}' AND height < ${minHeightToKeep}
+                `;
 
-                try {
-                    await this.client.command({ query: deleteQuery });
-                    logger.info(`Deleted records for batch ${i / batchSize + 1}/${Math.ceil(result.length / batchSize)}`);
-                } catch (err) {
-                    logger.error(`Delete failed for batch ${i / batchSize + 1}:`, err);
+                    try {
+                        await this.client.command({ query: deleteQuery });
+                        logger.info(`Deleted old records for address ${address} below height ${minHeightToKeep}`);
+                    } catch (err) {
+                        logger.error(`Delete failed for address ${address}:`, err);
+                    }
                 }
             }
 
-            logger.info('Cleanup completed.');
+            logger.info('Cleanup completed successfully.');
         } catch (error) {
             logger.error(`Error during cleanup: ${error}`);
         }
     }
+
 
     async insertBlock(block: Block): Promise<void> {
         try {
