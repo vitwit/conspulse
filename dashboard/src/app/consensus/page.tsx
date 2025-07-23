@@ -7,6 +7,7 @@ import { useTendermint } from "../context/TendermintListener";
 import { SupportUS } from "../components/SupportUs";
 import { useWebSocket } from "../context/WebsocketContext";
 import { Stats } from "../types/ws";
+import CopyButton from "../components/CopyButton";
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
 const NETWORK_NAME = process.env.NEXT_PUBLIC_NETWORK_NAME || "";
@@ -29,31 +30,6 @@ function timeAgo(date: Date | null) {
   if (diff < 60) return `${diff}s ago`;
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   return `${Math.floor(diff / 3600)}h ago`;
-}
-
-// Add a CopyButton component
-function CopyButton({ value, className = "" }: { value: string, className?: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <span className={"inline-flex items-center gap-1 " + className}>
-      <button
-        type="button"
-        aria-label="Copy to clipboard"
-        title={copied ? "Copied!" : "Copy"}
-        onClick={() => {
-          navigator.clipboard.writeText(value);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1200);
-        }}
-        className="ml-1 p-1 rounded hover:bg-gray-200 focus:outline-none"
-        tabIndex={0}
-      >
-        {/* Simple copy SVG icon */}
-        <svg width="16" height="16" fill="none" viewBox="0 0 20 20"><rect x="6" y="6" width="9" height="9" rx="2" stroke="#555" strokeWidth="1.5" /><rect x="3" y="3" width="9" height="9" rx="2" stroke="#bbb" strokeWidth="1.5" /></svg>
-      </button>
-      {copied && <span className="text-xs text-green-600">Copied!</span>}
-    </span>
-  );
 }
 
 type AccentColor = "blue" | "green" | "yellow" | "purple";
@@ -477,7 +453,7 @@ export default function Home() {
                     <div>
                       <span className="text-gray-500">Proposer Address</span>
                       <div className="font-mono flex items-center gap-1 text-gray-100">
-                        {proposerAddr}
+                        {proposerAddr}&nbsp;
                         <CopyButton value={proposerAddr} />
                       </div>
                     </div>
@@ -579,7 +555,7 @@ export default function Home() {
                           <td className="px-4 py-2 font-mono text-sm flex items-left gap-1"
                             title={v.address}
 
-                          >{monikers.get(v.address) || v.address}<CopyButton value={v.address} /></td>
+                          >{monikers.get(v.address) || v.address}&nbsp;<CopyButton value={v.address} /></td>
                           <td className="px-4 py-2">{votingPowerPercent}%</td>
                           <td className="px-4 py-2">{cumulativePercent}%</td>
                           <td className="px-4 py-2 text-center">{voted ? "✅" : "❌"}</td>

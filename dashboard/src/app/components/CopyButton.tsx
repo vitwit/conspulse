@@ -23,17 +23,23 @@ const CopyButton: React.FC<CopyButtonProps> = ({ value, size = "1x", className =
   };
 
   return (
+
     <button
-      onClick={handleCopy}
-      title="Copy to clipboard"
-      className={`ml-2 text-gray-400 hover:text-white transition-colors ${className}`}
-    >
-      <FontAwesomeIcon
-        icon={copied ? faCheck : faClipboard}
-        size={size}
-        className={copied ? "text-green-400" : ""}
-      />
-    </button>
+                onClick={handleCopy}
+                title="Copy"
+                style={{
+                    cursor: 'pointer',
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                }}
+                className="text-gray-600"
+                aria-label="Copy to clipboard"
+            >
+                <FontAwesomeIcon icon={copied ? faCheck : faClipboard} />
+            </button>
+            
+   
   );
 };
 

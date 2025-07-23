@@ -332,7 +332,7 @@ ORDER BY blockTime DESC;
 
             logger.info('Cleanup completed.');
         } catch (error) {
-            logger.error('Error during cleanup:', error);
+            logger.error(`Error during cleanup: ${error}`);
         }
     }
 
