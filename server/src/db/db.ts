@@ -284,13 +284,20 @@ ORDER BY blockTime DESC;
     }
 
     async cleanOldRecords(): Promise<void> {
+        // Fixed query using row_number() to find the 5000th latest height per address
         const cutoffQuery = `
         SELECT
             address,
-            arrayElement(groupArray(height ORDER BY height DESC), 5000) AS minHeightToKeep
-        FROM node_stats
+            min(height) AS minHeightToKeep
+        FROM (
+            SELECT
+                address,
+                height,
+                row_number() OVER (PARTITION BY address ORDER BY height DESC) AS rn
+            FROM node_stats
+        )
+        WHERE rn = 5000
         GROUP BY address
-        HAVING minHeightToKeep IS NOT NULL
     `;
 
         try {
@@ -301,19 +308,22 @@ ORDER BY blockTime DESC;
                 .query({
                     query: cutoffQuery,
                     format: 'JSONEachRow',
-
                     clickhouse_settings: {
                         max_memory_usage: '6000000000', // limit to 6 GiB just to be safe
                     }
                 })
                 .then((res) => res.json());
 
+            if (result.length === 0) {
+                logger.info('No records need pruning. Exiting cleanup.');
+                return;
+            }
+
             const batchSize = 50;
 
-            // Step 2: Delete records in smaller batches (1 deletion per address)
+            // Step 2: Delete records in batches
             for (let i = 0; i < result.length; i += batchSize) {
                 const batch = result.slice(i, i + batchSize);
-
                 logger.info(`Processing batch ${i / batchSize + 1} of ${Math.ceil(result.length / batchSize)}`);
 
                 for (const { address, minHeightToKeep } of batch) {
