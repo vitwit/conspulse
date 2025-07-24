@@ -26,7 +26,7 @@ export default function ShortName({ value, maxLength, iconColor = "text-gray-600
 
     return (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span className='text-gray-200 text-xs'>{shorten(value, maxLength)}</span>
+            <span className='text-gray-400 text-xs'>{shorten(value, maxLength)}</span>
             <button
                 onClick={handleCopy}
                 title="Copy"

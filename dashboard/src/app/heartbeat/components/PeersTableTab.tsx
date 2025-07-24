@@ -3,6 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import ShortName from './../../components/ShortName';
 import Moniker from '@/app/components/Moniker';
+import NodeIdentityCell from './NodeIdentityCell';
+import LatencyCell from './LatencyCell';
 
 interface Stats {
     address: string;
@@ -56,8 +58,7 @@ const PeersTableTab: React.FC<Props> = ({
     const headers = [
         '★',
         '#',
-        'Moniker',
-        'Node ID',
+        'Node',
         'Earliest Height',
         'Latest Height',
         'Hash',
@@ -145,8 +146,13 @@ const PeersTableTab: React.FC<Props> = ({
                                                 {favoriteNodes.has(node.address) ? '★' : '☆'}
                                             </button>,
                                             idx + 1,
-                                            <Moniker name={node.moniker} value={`0x${node.address}`} explorerUrl={process.env.NEXT_PUBLIC_EXPLORER_URL || ""} />,
-                                            <ShortName value={node.nodeID} maxLength={7} />,
+                                            <NodeIdentityCell
+                                                moniker={node.moniker}
+                                                nodeId={node.nodeID}
+                                                address={node.address}
+                                                explorerUrl={process.env.NEXT_PUBLIC_EXPLORER_URL || ""}
+                                            />,
+
                                             node.earliestBlockHeight.toLocaleString(),
                                             node.latestBlockHeight.toLocaleString(),
                                             <ShortName value={node.latestAppHash} maxLength={7} />,
@@ -158,9 +164,9 @@ const PeersTableTab: React.FC<Props> = ({
                                             node.version,
                                             node.os,
                                             node.goVersion,
-                                            formatLatency(node.latency),
+                                            <LatencyCell latency={node.latency} formatted={formatLatency(node.latency)} />,
                                         ].map((value, i) => (
-                                            <td key={i} className="px-4 py-4 font-mono text-sm text-gray-100 whitespace-nowrap">
+                                            <td key={i} className="px-4 py-4 font-mono text-sm text-gray-400 whitespace-nowrap">
                                                 <motion.div
                                                     initial="initial"
                                                     animate="animate"

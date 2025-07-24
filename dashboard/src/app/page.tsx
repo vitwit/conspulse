@@ -472,14 +472,14 @@ export default function NetstatsPage() {
           <div>
             {/* <div className="bg-[#1a1e24] rounded-lg p-4 pb-8 mt-4 border border-[#2a2f3a] relative"> */}
               {/* Toggle Icon */}
-              {/* <button
+              {/*<button
                 onClick={toggleVisibility}
                 className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors"
                 aria-label="Toggle visibility"
               >
                 {visible ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
               </button>
-            </div> */}
+            </div>*/}
 
             {/* Toggle Content */}
             <div
