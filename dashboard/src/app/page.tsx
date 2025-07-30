@@ -90,6 +90,7 @@ export default function NetstatsPage() {
   const [proposer, setProposer] = useState<string>("");
   const event = useTendermint();
 
+  const [lastBlockTime, setLastBlockTime] = useState(new Date())
   useEffect(() => {
     if (!event) return;
 
@@ -101,6 +102,7 @@ export default function NetstatsPage() {
           : String(event.height);
         if (formattedHeight !== height && formattedHeight > height) {
           setHeight(formattedHeight);
+          setLastBlockTime(new Date());
         }
       }
 
@@ -139,10 +141,7 @@ export default function NetstatsPage() {
     }
   };
 
-
-
   const [favoriteNodes, setFavoriteNodes] = useState<Set<string>>(new Set());
-
   const toggleFavorite = (address: string) => {
     setFavoriteNodes((prev) => {
       const newSet = new Set(prev);
@@ -203,9 +202,6 @@ export default function NetstatsPage() {
 
     previousNodesRef.current = nodes;
   }, [nodes]);
-
-
-
 
   const fetchDump = useCallback(async () => {
     setErrorDump(null);
@@ -307,10 +303,6 @@ export default function NetstatsPage() {
   );
 
   const roundStartTime = new Date(roundState?.start_time) || Date.now()
-  const lastBlockTime = roundState?.start_time
-    ? new Date(roundState.start_time)
-    : null;
-
   const lastCommit = roundState?.last_commit;
   const lastCommitVotes = lastCommit?.votes || [];
   const lastCommitBitArray = lastCommit?.votes_bit_array || "";

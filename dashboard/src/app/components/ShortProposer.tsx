@@ -3,8 +3,6 @@ import { ShortNameProps } from './ShortName';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faClipboard, faCheck } from '@fortawesome/free-solid-svg-icons';
 
-
-
 export default function ShortProposerName({ value, maxLength, iconColor = "text-gray-600" }: ShortNameProps) {
     const [copied, setCopied] = useState(false);
 
@@ -21,7 +19,9 @@ export default function ShortProposerName({ value, maxLength, iconColor = "text-
 
     return (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span className='text-cyan-400 text-md'>{shorten(value, maxLength)}</span>
+            <span className='text-cyan-400 text-md hover:cursor-pointer'
+                onClick={handleCopy}
+            >{shorten(value, maxLength)}</span>
             <button
                 onClick={handleCopy}
                 title="Copy"
