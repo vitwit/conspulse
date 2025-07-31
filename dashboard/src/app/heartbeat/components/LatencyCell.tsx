@@ -6,12 +6,23 @@ interface Props {
 }
 
 const LatencyCell: React.FC<Props> = ({ latency, formatted }) => {
-    const isHigh = latency > 100;
+    const colorClass =
+        latency > 100
+            ? 'text-red-300'
+            : latency > 50
+            ? 'text-yellow-300'
+            : 'text-gray-400';
 
     return (
         <span
-            className={`font-mono ${isHigh ? 'bg-red-900/40 text-red-300 px-2 py-1 rounded' : ''}`}
-            title={isHigh ? 'High latency' : 'Latency OK'}
+            className={`font-mono ${colorClass}`}
+            title={
+                latency > 100
+                    ? 'High latency'
+                    : latency > 50
+                    ? 'Moderate latency'
+                    : 'Latency OK'
+            }
         >
             {formatted}
         </span>

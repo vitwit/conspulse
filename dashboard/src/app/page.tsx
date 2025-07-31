@@ -399,7 +399,7 @@ export default function NetstatsPage() {
       description: "The time elapsed since the most recently committed block.",
       value: lastBlockTime ? timeAgo(lastBlockTime, Date.now()) : "—",
       icon: Clock,
-      accent: "lime",
+      accent: "stone",
     },
     {
       title: "Votes %",
@@ -418,7 +418,7 @@ export default function NetstatsPage() {
       accent: "cyan",
     },
     {
-      title: "Voting Power",
+      title: "Proposer Voting Power",
       description: "The voting power (stake) of the current block proposer",
       value: (proposerObj && proposerObj.voting_power ? parseInt(proposerObj?.voting_power)?.toLocaleString() : "0") ?? "0",
       icon: Shield,
@@ -612,6 +612,7 @@ export default function NetstatsPage() {
               updatedRows={updatedRows}
               favoriteNodes={favoriteNodes}
               toggleFavorite={toggleFavorite}
+              currentHeight={height}
             />
 
           )}

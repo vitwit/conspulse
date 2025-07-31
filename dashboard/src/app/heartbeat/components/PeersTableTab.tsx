@@ -1,8 +1,7 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import ShortName from './../../components/ShortName';
-import Moniker from '@/app/components/Moniker';
 import NodeIdentityCell from './NodeIdentityCell';
 import LatencyCell from './LatencyCell';
 
@@ -35,6 +34,7 @@ interface Props {
     updatedRows: any;
     favoriteNodes: Set<string>;
     toggleFavorite: (address: string) => void;
+    currentHeight: string;
 }
 
 const sortKeyMap: Record<string, keyof Stats> = {
@@ -54,6 +54,7 @@ const PeersTableTab: React.FC<Props> = ({
     updatedRows,
     favoriteNodes,
     toggleFavorite,
+    currentHeight
 }) => {
     const headers = [
         '★',
@@ -154,9 +155,26 @@ const PeersTableTab: React.FC<Props> = ({
                                             />,
 
                                             node.earliestBlockHeight.toLocaleString(),
-                                            node.latestBlockHeight.toLocaleString(),
+                                            <span className={
+                                                parseInt(currentHeight, 10) - node.latestBlockHeight <= 5
+                                                    ? 'text-gray-400'
+                                                    : parseInt(currentHeight, 10) - node.latestBlockHeight <= 25
+                                                        ? 'text-yellow-400'
+                                                        : 'text-red-500'
+                                            }>
+                                                {node.latestBlockHeight.toLocaleString()}
+                                            </span>,
+
                                             <ShortName value={node.latestAppHash} maxLength={7} />,
-                                            `${Math.floor((Date.now() - node.blockTime * 1000) / 1000)}s ago`,
+                                            <span className={
+                                                (Date.now() - node.blockTime * 1000) / 1000 > 30
+                                                    ? 'text-red-500'
+                                                    : (Date.now() - node.blockTime * 1000) / 1000 > 15
+                                                        ? 'text-yellow-400'
+                                                        : 'text-gray-400'
+                                            }>
+                                                {`${Math.floor((Date.now() - node.blockTime * 1000) / 1000)}s ago`}
+                                            </span>,
                                             node.isSyncing ? 'Syncing' : 'Yes',
                                             node.network,
                                             node.votingPower > 0 ? node.votingPower : 0,
