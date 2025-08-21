@@ -12,6 +12,7 @@ interface Props {
 
 const NodeIdentityCell: React.FC<Props> = ({ moniker, nodeId, address, explorerUrl }) => {
     const shortNodeId = `${nodeId.slice(0, 6)}...`;
+    const shortAddress = `${address.slice(0,6)}...${address.slice(-6,)}`
     const [copied, setCopied] = useState(false);
 
     const handleCopy = () => {
@@ -24,7 +25,7 @@ const NodeIdentityCell: React.FC<Props> = ({ moniker, nodeId, address, explorerU
         <div className="flex items-start gap-3">
             {/* Avatar */}
             <div className="h-8 w-8 flex items-center justify-center rounded-full bg-green-600 text-white font-bold uppercase">
-                {moniker?.charAt(0) || '?'}
+                {(nodeId || moniker)?.charAt(0) || '?'}
             </div>
 
             {/* Moniker + NodeID */}
@@ -38,7 +39,7 @@ const NodeIdentityCell: React.FC<Props> = ({ moniker, nodeId, address, explorerU
                         className="hover:underline text-green-400 font-medium"
                         title="View in explorer"
                     >
-                        {moniker}
+                        {nodeId || moniker}
                     </a>
                     <FontAwesomeIcon
                         icon={faExternalLink}
@@ -49,7 +50,8 @@ const NodeIdentityCell: React.FC<Props> = ({ moniker, nodeId, address, explorerU
                 </div>
 
                 <div className="flex items-center gap-1 text-xs text-zinc-400 font-mono mt-1">
-                    <span>{shortNodeId}</span>
+                    <span>{shortAddress}</span>
+
                     <FontAwesomeIcon
                         icon={copied ? faCheck : faClipboard}
                         className={`cursor-pointer transition-colors duration-300 ${
