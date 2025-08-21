@@ -10,9 +10,13 @@ interface Props {
     explorerUrl: string;
 }
 
+const formatNodeId = (nodeId: string): string => {
+    if (!nodeId) return '';
+    return nodeId.length > 25 ? `${nodeId.slice(0, 25)}...` : nodeId;
+};
+
 const NodeIdentityCell: React.FC<Props> = ({ moniker, nodeId, address, explorerUrl }) => {
-    const shortNodeId = `${nodeId.slice(0, 6)}...`;
-    const shortAddress = `${address.slice(0,6)}...${address.slice(-6,)}`
+    const shortAddress = `${address.slice(0,6)}...${address.slice(-6,)}`;
     const [copied, setCopied] = useState(false);
 
     const handleCopy = () => {
@@ -39,7 +43,7 @@ const NodeIdentityCell: React.FC<Props> = ({ moniker, nodeId, address, explorerU
                         className="hover:underline text-green-400 font-medium"
                         title="View in explorer"
                     >
-                        {nodeId || moniker}
+                        {formatNodeId(nodeId) || formatNodeId(moniker)}
                     </a>
                     <FontAwesomeIcon
                         icon={faExternalLink}
