@@ -4,6 +4,25 @@ import { AnimatePresence, motion } from 'framer-motion';
 import ShortName from './../../components/ShortName';
 import NodeIdentityCell from './NodeIdentityCell';
 import LatencyCell from './LatencyCell';
+import { formatLatency } from '@/app/utils';
+
+export function timeAgo(timestamp: number): string {
+    const now = Date.now();
+    let diff = now - timestamp * 1000; // convert seconds to milliseconds
+
+    const SECOND = 1000;
+    const MINUTE = 60 * SECOND;
+    const HOUR = 60 * MINUTE;
+    const DAY = 24 * HOUR;
+
+    if (diff < SECOND) return 'just now';
+    if (diff < MINUTE) return `${Math.floor(diff / SECOND)}s ago`;
+    if (diff < HOUR) return `${Math.floor(diff / MINUTE)}m ago`;
+    if (diff < DAY) return `${Math.floor(diff / HOUR)}h ago`;
+
+    return `${Math.floor(diff / DAY)}d ago`;
+}
+
 
 interface Stats {
     address: string;
@@ -29,7 +48,6 @@ interface Props {
     sortBy: string;
     sortDirection: 'asc' | 'desc';
     handleSort: (key: string) => void;
-    formatLatency: (ms: number) => string;
     rowVariants: any;
     updatedRows: any;
     favoriteNodes: Set<string>;
@@ -41,6 +59,10 @@ const sortKeyMap: Record<string, keyof Stats> = {
     votingpower: 'votingPower',
     earliestheight: 'earliestBlockHeight',
     latestheight: 'latestBlockHeight',
+    node: 'nodeID',
+    hash: 'latestAppHash',
+    blocktime: 'blockTime',
+    caughtup: 'isSyncing',
 };
 
 const PeersTableTab: React.FC<Props> = ({
@@ -49,7 +71,6 @@ const PeersTableTab: React.FC<Props> = ({
     sortBy,
     sortDirection,
     handleSort,
-    formatLatency,
     rowVariants,
     updatedRows,
     favoriteNodes,
@@ -81,14 +102,13 @@ const PeersTableTab: React.FC<Props> = ({
                     <tr>
                         {headers.map((title, index) => {
                             const key = title.toLowerCase().replace(/ /g, '');
-
                             const normalizedKey = sortKeyMap[key] || key;
                             const isSorted = sortBy === normalizedKey;
 
                             return (
                                 <th
                                     key={index}
-                                    onClick={() => handleSort(key)}
+                                    onClick={() => handleSort(normalizedKey)}
                                     className="cursor-pointer px-4 py-3 whitespace-nowrap hover:text-zinc-400 transition text-zinc-500/90 select-none"
                                 >
                                     <div className="flex items-center gap-1">
@@ -173,7 +193,7 @@ const PeersTableTab: React.FC<Props> = ({
                                                         ? 'text-yellow-400'
                                                         : 'text-gray-400'
                                             }>
-                                                {`${Math.floor((Date.now() - node.blockTime * 1000) / 1000)}s ago`}
+                                                {timeAgo(node.blockTime)}
                                             </span>,
                                             node.isSyncing ? 'Syncing' : 'Yes',
                                             node.network,

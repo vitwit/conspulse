@@ -1,4 +1,5 @@
 "use client";
+
 import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -19,15 +20,12 @@ import {
   Timer,
   Vote,
   User,
-  Info,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 import { BlockPropagationGraph } from "./heartbeat/components/BlockPropagationGraph";
 import BarChart from "./heartbeat/components/Barchart";
 import { BitArrayCandles } from "./heartbeat/components/BitArrayCandles";
 import { ErrorAlert } from "./heartbeat/components/ErrorAlert";
-import { formatLatency, timeAgo } from "./utils";
+import { timeAgo } from "./utils";
 import { useWebSocket } from './context/WebsocketContext';
 import { NetworkMessage, Stats } from "./types/ws";
 import { SupportUS } from "./components/SupportUs";
@@ -37,6 +35,10 @@ import { useTendermint } from "./context/TendermintListener";
 import { isEqual } from "lodash";
 import ShortProposerName from "./components/ShortProposer";
 import DescriptionTooltip from "./components/DescriptionTooltip";
+
+const SORT_BY_KEY = 'heartbeatSortBy';
+const SORT_DIRECTION_KEY = 'heartbeatSortDirection';
+
 
 const rowVariants = {
   initial: { opacity: 0, y: -20 },
@@ -79,8 +81,10 @@ export default function NetstatsPage() {
 
   const [versions, setVersions] = useState<string[]>([]);
 
-  const [sortBy, setSortBy] = useState<string>('moniker');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [sortBy, setSortBy] = useState<string>("moniker");
+
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>("asc");
+
 
   const { networkStats, nodesStats, retries, error } = useWebSocket();
 
@@ -122,6 +126,18 @@ export default function NetstatsPage() {
     return () => clearTimeout(timeout);
   }, [event, height, round, step, proposer]);
 
+  useEffect(() => {
+    const stored = localStorage.getItem(SORT_BY_KEY);
+    if (stored) {
+      setSortBy(stored);
+    }
+
+    const stored1 = localStorage.getItem(SORT_DIRECTION_KEY);
+    if (stored1 && (stored1 === "asc" || stored1 === "desc")) {
+      setSortDirection(stored1);
+    }
+  }, [])
+
 
 
   const sortKeyMap: Record<string, keyof Stats> = {
@@ -131,15 +147,31 @@ export default function NetstatsPage() {
   };
 
   const handleSort = (key: string) => {
+
     const normalizedKey = sortKeyMap[key.toLowerCase()] || key;
 
     if (sortBy === normalizedKey) {
-      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+      setSortDirection(prev => {
+        const newDirection = prev === 'asc' ? 'desc' : 'asc';
+        localStorage.setItem(SORT_DIRECTION_KEY, newDirection);
+        return newDirection;
+      });
     } else {
       setSortBy(normalizedKey);
       setSortDirection('asc');
+
+      localStorage.setItem(SORT_BY_KEY, normalizedKey);
+      localStorage.setItem(SORT_DIRECTION_KEY, 'asc');
     }
   };
+
+  useEffect(() => {
+    localStorage.setItem(SORT_BY_KEY, sortBy);
+  }, [sortBy]);
+
+  useEffect(() => {
+    localStorage.setItem(SORT_DIRECTION_KEY, sortDirection);
+  }, [sortDirection]);
 
   const [favoriteNodes, setFavoriteNodes] = useState<Set<string>>(new Set());
   const toggleFavorite = (address: string) => {
@@ -463,8 +495,8 @@ export default function NetstatsPage() {
 
           <div>
             {/* <div className="bg-[#1a1e24] rounded-lg p-4 pb-8 mt-4 border border-[#2a2f3a] relative"> */}
-              {/* Toggle Icon */}
-              {/*<button
+            {/* Toggle Icon */}
+            {/*<button
                 onClick={toggleVisibility}
                 className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors"
                 aria-label="Toggle visibility"
@@ -607,7 +639,6 @@ export default function NetstatsPage() {
               sortBy={sortBy}
               sortDirection={sortDirection}
               handleSort={handleSort}
-              formatLatency={formatLatency}
               rowVariants={rowVariants}
               updatedRows={updatedRows}
               favoriteNodes={favoriteNodes}

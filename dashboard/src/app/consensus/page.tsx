@@ -1,8 +1,10 @@
 "use client";
+
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { useTendermint } from "../context/TendermintListener";
+import { useTendermintHistory, ValidatorInfo } from "../context/TendermintHistoryListener";
 import { SupportUS } from "../components/SupportUs";
 import { useWebSocket } from "../context/WebsocketContext";
 import { Stats } from "../types/ws";
@@ -24,7 +26,6 @@ const shorten = (str: string, chars = 6): string => {
 }
 
 function parseBitArray(str: string) {
-  // Example: BA{21:x_x_xxxxxx________x__} 137002711/192368453 = 0.71
   const match = str.match(/([\d]+)\/([\d]+)\s*=\s*([\d.]+)/);
   if (!match) return { percent: 0 };
   return { percent: Math.round(Number(match[3]) * 100) };
@@ -32,36 +33,20 @@ function parseBitArray(str: string) {
 
 function timeAgo(date: Date | null) {
   if (!date) return "";
-
-  const diffMs = Date.now() - date.getTime(); // in milliseconds
+  const diffMs = Date.now() - date.getTime();
   const diffSec = Math.floor(diffMs / 1000);
-
   if (diffSec < 60) return `${diffSec}s ago`;
   if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
-
   return `${Math.floor(diffSec / 3600)}h ago`;
 }
-
 
 type AccentColor = "blue" | "green" | "yellow" | "purple";
 
 export default function Home() {
-  const [consensus, setConsensus] = useState<{
-    "height/round/step"?: string;
-    height_vote_set?: Array<{
-      round: number;
-      prevotes: string[];
-      precommits: string[];
-      prevotes_bit_array: string;
-      precommits_bit_array: string;
-    }>;
-    proposer?: { address: string };
-    start_time?: string;
-  } | null>(null);
-  const [validators, setValidators] = useState<{ address: string; voting_power: string }[]>([]);
+  const [consensus, setConsensus] = useState<any>(null);
+  const [validators, setValidators] = useState<ValidatorInfo[]>([]);
   const [timer, setTimer] = useState(1);
   const [favourites, setFavourites] = useState<string[]>([]);
-  const [sortByPower, setSortByPower] = useState<"desc" | "asc">("desc");
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [chainId, setChainId] = useState<string | null>(null);
   const [proposer, setProposer] = useState<string | null>(null);
@@ -72,8 +57,14 @@ export default function Home() {
   const [dumpConsensus, setDumpConsensus] = useState<any>(null);
   const [dumpLoading, setDumpLoading] = useState(false);
   const [dumpError, setDumpError] = useState<string | null>(null);
+  const [paused, setPaused] = useState(false);
 
-  const event = useTendermint();
+  const eventRaw = useTendermint();
+  const historyRaw = useTendermintHistory();
+
+  const event = paused ? null : eventRaw;
+  const history = paused ? null : historyRaw;
+
   const [currentStep, setCurrentStep] = useState<string>("");
   const [height, setHeight] = useState<number>(0);
   const [round, setRound] = useState<number>(0);
@@ -91,64 +82,51 @@ export default function Home() {
     }
   }, [nodesStats]);
 
+  useEffect(() => {
+    if (history?.validators && history.validators.length > 0) {
+      setValidators(history.validators);
+    }
+  }, [history?.validators]);
+
   const [lastBlockTime, setLastBlockTime] = useState(new Date());
   useEffect(() => {
     if (!event) return;
-
     switch (event.step) {
       case "NewHeight":
         setProgressFill(25);
         setLastBlockTime(new Date());
         break;
       case "Propose":
-        setTimeout(() => {
-          setProgressFill(50);
-        }, 250)
+        setTimeout(() => setProgressFill(50), 250);
         break;
       case "Prevote":
-        setTimeout(() => {
-          setProgressFill(75);
-        }, 400)
+        setTimeout(() => setProgressFill(75), 400);
         break;
       case "Commit":
-        setTimeout(() => {
-          setProgressFill(100);
-        }, 500)
-        break;
-      case "NewBlock":
-        // fetchData();
+        setTimeout(() => setProgressFill(100), 500);
         break;
     }
-
     if (height < event.height) {
-      setTimeout(() => {
-        setProgressFill(0);
-      }, 1000)
+      setTimeout(() => setProgressFill(0), 1000);
       setHeight(event.height);
       setRound(event.round);
       setBlockFlash(true);
       setTimeout(() => setBlockFlash(false), 200);
     }
-
   }, [event]);
 
-
-  // Load favourites from localStorage
   useEffect(() => {
     const favs = localStorage.getItem("favourite_validators");
     if (favs) setFavourites(JSON.parse(favs));
   }, []);
 
-  // Save favourites to localStorage
   useEffect(() => {
     localStorage.setItem("favourite_validators", JSON.stringify(favourites));
   }, [favourites]);
 
   const toggleFavourite = useCallback((address: string) => {
     setFavourites((prev) =>
-      prev.includes(address)
-        ? prev.filter((a) => a !== address)
-        : [...prev, address]
+      prev.includes(address) ? prev.filter((a) => a !== address) : [...prev, address]
     );
   }, []);
 
@@ -159,9 +137,7 @@ export default function Home() {
       setConsensus(consensusData.result.round_state);
       setProposer(consensusData.result.round_state.proposer?.address || null);
       const { height } = parseHeightRoundStep(consensusData.result.round_state["height/round/step"] || "");
-      // Use previous consensus state if height increments by 1
       if (prevConsensus && prevHeight && height === prevHeight + 1) {
-        // setChainId(prevConsensus.chain_id || null);
       } else if (height > 1) {
         try {
           const blockRes = await fetch(`${RPC_URL}/block?height=${height - 1}`);
@@ -175,10 +151,6 @@ export default function Home() {
       } else {
         setChainId(null);
       }
-      const validatorsRes = await fetch(`${RPC_URL}/validators?height=${height}`);
-      const validatorsData = await validatorsRes.json();
-      setValidators(validatorsData.result.validators);
-      // Store previous consensus state and height for next fetch
       setPrevConsensus({
         chain_id: consensusData.result.round_state.chain_id || chainId,
         time: consensusData.result.round_state.start_time || null,
@@ -186,7 +158,6 @@ export default function Home() {
       setPrevHeight(height);
     } catch {
       setConsensus(null);
-      setValidators([]);
       setChainId(null);
       setProposer(null);
       setPrevConsensus(null);
@@ -202,8 +173,8 @@ export default function Home() {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
-
   useEffect(() => {
+    if (paused) return;
     if (timer === 0) {
       fetchData();
       return;
@@ -214,30 +185,56 @@ export default function Home() {
     };
   }, [timer]);
 
-  // Summary fields
   let prevotes = 0, precommits = 0;
   if (consensus) {
     prevotes = parseBitArray(consensus.height_vote_set?.[0]?.prevotes_bit_array || "").percent;
     precommits = parseBitArray(consensus.height_vote_set?.[0]?.precommits_bit_array || "").percent;
   }
 
-
-  // Voting power calculations
-  const totalVotingPower = validators.reduce((sum, v) => sum + Number(v.voting_power), 0);
+  const totalVotingPower = validators.reduce((sum, v) => sum + Number(v.votingPower), 0);
   let cumulative = 0;
 
-  // Sorting and ordering
+  const [sortConfig, setSortConfig] = useState<{ key: "votingPower" | "address"; direction: "asc" | "desc" }>(
+    { key: "votingPower", direction: "desc" } // stable default
+  );
+
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("sortConfig");
+    if (stored) setSortConfig(JSON.parse(stored));
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted) {
+      localStorage.setItem("sortConfig", JSON.stringify(sortConfig));
+    }
+  }, [sortConfig, mounted]);
+
+
+  // Sorting logic
   let sortedValidators = [...validators];
-  // Order by favourites first
   sortedValidators.sort((a, b) => {
     const aFav = favourites.includes(a.address);
     const bFav = favourites.includes(b.address);
     if (aFav && !bFav) return -1;
     if (!aFav && bFav) return 1;
-    // If both are (or aren't) favourites, sort by voting power
-    const aPower = Number(a.voting_power);
-    const bPower = Number(b.voting_power);
-    return sortByPower === "desc" ? bPower - aPower : aPower - bPower;
+
+    if (sortConfig.key === "votingPower") {
+      const aPower = Number(a.votingPower);
+      const bPower = Number(b.votingPower);
+      return sortConfig.direction === "desc" ? bPower - aPower : aPower - bPower;
+    }
+
+    if (sortConfig.key === "address") {
+      const aName = monikers.get(a.address) || a.address;
+      const bName = monikers.get(b.address) || b.address;
+      return sortConfig.direction === "desc"
+        ? bName.localeCompare(aName)
+        : aName.localeCompare(bName);
+    }
+    return 0;
   });
 
   const stepLabels = [
@@ -255,16 +252,19 @@ export default function Home() {
   };
 
   const [copied, setCopied] = useState(false);
-
   const handleCopy = async (value: string) => {
     await navigator.clipboard.writeText(value);
     setCopied(true);
     setTimeout(() => setCopied(false), 1000);
   };
 
+  const dumpLoadingRef = useRef(false);
+
   const fetchDumpConsensus = useCallback(async () => {
-    setDumpLoading(true);
+    if (dumpLoadingRef.current) return;
+    dumpLoadingRef.current = true;
     setDumpError(null);
+
     try {
       const res = await fetch(`${RPC_URL}/dump_consensus_state`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -272,18 +272,17 @@ export default function Home() {
       setDumpConsensus(data);
     } catch (err: any) {
       setDumpError(err.message || "Unknown error");
-      setDumpConsensus(null);
     } finally {
-      setDumpLoading(false);
+      dumpLoadingRef.current = false;
     }
   }, []);
 
-  // Auto-refresh every second, like consensus state
+
   useEffect(() => {
+    if (paused) return;
     fetchDumpConsensus();
-    const interval = setInterval(fetchDumpConsensus, 10000);
-    return () => clearInterval(interval);
-  }, [fetchDumpConsensus]);
+  }, [height, paused, fetchDumpConsensus]);
+
 
   const cards: { label: string; value: string | number; accent: AccentColor }[] = [
     { label: "Latest Height", value: height.toLocaleString() ?? "—", accent: "blue" },
@@ -318,17 +317,33 @@ export default function Home() {
 
       <main className="flex-1 mt-4 px-4 sm:px-8">
         <section className="p-4 sm:p-8 mx-auto bg-[#1a1e24] rounded-xl shadow-lg">
-          {/* Header Section */}
           <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
               <h1 className="text-2xl font-bold text-white">Consensus State</h1>
+
               {NETWORK_NAME && (
-                <span className="text-sm font-medium text-blue-300 bg-blue-900/30 rounded px-3 py-1 ml-0 sm:ml-3 mt-1 sm:mt-0 border border-blue-600">
+                <span className="text-sm font-medium text-blue-300 bg-blue-900/30 rounded px-3 py-1 border border-blue-600">
                   {NETWORK_NAME}
                 </span>
               )}
             </div>
+
+            <button
+              onClick={() => {
+                if (paused) {
+                  setPaused(false);
+                  fetchData();
+                } else {
+                  setPaused(true);
+                }
+              }}
+              className={`px-3 py-1 rounded font-semibold hover:cursor-pointer ${paused ? "bg-green-700 hover:bg-green-600" : "bg-red-700 hover:bg-red-600"
+                }`}
+            >
+              {paused ? "Resume" : "Pause"}
+            </button>
           </div>
+
 
           {/* Summary Section */}
           <div className="mx-auto mb-8">
@@ -497,46 +512,66 @@ export default function Home() {
             ) : null;
           })()}
 
-
-          {/* ... same dark theme update applied */}
-
           {/* Validators Table Section */}
           <div className="relative">
             <div className="mb-4 flex justify-between items-center">
               <h2 className="text-xl font-bold text-cyan-300">Validators State</h2>
-              {/* <button
-                  className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-sm font-medium text-white rounded"
-                  onClick={() => setSortByPower((s) => (s === "desc" ? "asc" : "desc"))}
-                >
-                  Sort by Voting Power: {sortByPower === "desc" ? "High → Low" : "Low → High"}
-                </button> */}
             </div>
 
             <div className="relative overflow-x-auto border border-gray-700 rounded-lg">
               <table className="w-full bg-[#1a1e24] rounded-lg overflow-hidden">
                 <thead className="bg-gray-800 text-gray-400 text-xs uppercase">
                   <tr>
-                    <th className="px-4 py-2 text-left" title="Mark as favourite for quick access">Favourite</th>
-                    <th className="px-4 py-2 text-left" title="Validator operator address">Validator Address</th>
-                    <th className="px-4 py-2 text-left cursor-pointer" title="Sort by voting power (%)" onClick={() => setSortByPower((s) => (s === "desc" ? "asc" : "desc"))}>
+                    <th className="px-4 py-2 text-left">Favourite</th>
+                    <th
+                      className="px-4 py-2 text-left cursor-pointer"
+                      title="Sort by moniker (or address if missing)"
+                      onClick={() =>
+                        setSortConfig((prev) => ({
+                          key: "address",
+                          direction: prev.key === "address" && prev.direction === "asc" ? "desc" : "asc",
+                        }))
+                      }
+                    >
                       <span className="inline-flex items-center gap-1">
-                        Voting Power
-                        {sortByPower === "desc" ? (
-                          <svg className="inline w-4 h-4 ml-1" viewBox="0 0 16 16" fill="none"><path d="M8 11L3 6h10L8 11z" fill="#38bdf8" /></svg>
-                        ) : (
-                          <svg className="inline w-4 h-4 ml-1" viewBox="0 0 16 16" fill="none"><path d="M8 5l5 5H3l5-5z" fill="#38bdf8" /></svg>
-                        )}
+                        Validator Address
+                        {sortConfig.key === "address" &&
+                          (sortConfig.direction === "desc" ? (
+                            <svg className="inline w-4 h-4 ml-1" viewBox="0 0 16 16" fill="none"><path d="M8 11L3 6h10L8 11z" fill="#38bdf8" /></svg>
+                          ) : (
+                            <svg className="inline w-4 h-4 ml-1" viewBox="0 0 16 16" fill="none"><path d="M8 5l5 5H3l5-5z" fill="#38bdf8" /></svg>
+                          ))}
                       </span>
                     </th>
-                    <th className="px-4 py-2 text-left" title="Cumulative voting power up to this validator">Cumulative Voting Power</th>
-                    <th className="px-4 py-2 text-left" title="Did this validator prevote in the current round?">Voted</th>
-                    <th className="px-4 py-2 text-left" title="Did this validator precommit in the current round?">Precommit</th>
-                    <th className="px-4 py-2 text-left" title="The latest round number for this block">Latest Round</th>
+                    <th
+                      className="px-4 py-2 text-left cursor-pointer"
+                      title="Sort by voting power (%)"
+                      onClick={() =>
+                        setSortConfig((prev) => ({
+                          key: "votingPower",
+                          direction: prev.key === "votingPower" && prev.direction === "asc" ? "desc" : "asc",
+                        }))
+                      }
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        Voting Power
+                        {sortConfig.key === "votingPower" &&
+                          (sortConfig.direction === "desc" ? (
+                            <svg className="inline w-4 h-4 ml-1" viewBox="0 0 16 16" fill="none"><path d="M8 11L3 6h10L8 11z" fill="#38bdf8" /></svg>
+                          ) : (
+                            <svg className="inline w-4 h-4 ml-1" viewBox="0 0 16 16" fill="none"><path d="M8 5l5 5H3l5-5z" fill="#38bdf8" /></svg>
+                          ))}
+                      </span>
+                    </th>
+                    <th className="px-4 py-2 text-left">Cumulative Voting Power</th>
+                    <th className="px-4 py-2 text-left">Voted</th>
+                    <th className="px-4 py-2 text-left">Precommit</th>
+                    <th className="px-4 py-2 text-left">Latest Round</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sortedValidators.map((v, idx) => {
-                    const votingPower = Number(v.voting_power);
+                    const votingPower = Number(v.votingPower);
                     const votingPowerPercent = totalVotingPower ? ((votingPower / totalVotingPower) * 100).toFixed(2) : "0.00";
                     cumulative += votingPower;
                     const cumulativePercent = totalVotingPower ? ((cumulative / totalVotingPower) * 100).toFixed(2) : "0.00";
@@ -568,8 +603,9 @@ export default function Home() {
                         </td>
                         <td className="px-4 py-2 font-mono text-sm flex items-left gap-1"
                           title={v.address}
-
-                        >{monikers.get(v.address) || v.address}&nbsp;<CopyButton value={v.address} /></td>
+                        >
+                          {monikers.get(v.address) || v.address}&nbsp;<CopyButton value={v.address} />
+                        </td>
                         <td className="px-4 py-2">{votingPowerPercent}%</td>
                         <td className="px-4 py-2">{cumulativePercent}%</td>
                         <td className="px-4 py-2 text-center">{voted ? "✅" : "❌"}</td>
