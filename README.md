@@ -33,7 +33,7 @@ npm install
 3. Create a `.env` file with the following contents:
 
 ```env
-API_SECRET=super-secret-api-key
+API_SECRET=api-secret
 CLICKHOUSE_HOST=http://localhost:8123
 CLICKHOUSE_USER=default
 CLICKHOUSE_PASSWORD=your_secure_password
