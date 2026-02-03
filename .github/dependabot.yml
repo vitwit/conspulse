@@ -4,12 +4,12 @@ updates:
   - package-ecosystem: "npm"
     directory: "/dashboard"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     open-pull-requests-limit: 10
 
   # Node.js server
   - package-ecosystem: "npm"
     directory: "/server"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     open-pull-requests-limit: 10
