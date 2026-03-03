@@ -37,7 +37,7 @@ const NodeIdentityCell: React.FC<Props> = ({ moniker, nodeId, address, explorerU
                 {/* Moniker with explorer link */}
                 <div className="flex items-center gap-1">
                     <a
-                        href={`${explorerUrl}/validators/${address}`}
+                        href={`${explorerUrl}/0x${address}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="hover:underline text-green-400 font-medium"
@@ -49,7 +49,7 @@ const NodeIdentityCell: React.FC<Props> = ({ moniker, nodeId, address, explorerU
                         icon={faExternalLink}
                         className="text-green-400 opacity-70 cursor-pointer hover:opacity-100"
                         title="Open in explorer"
-                        onClick={() => window.open(`${explorerUrl}/validators/0x${address}`, '_blank')}
+                        onClick={() => window.open(`${explorerUrl}/0x${address}`, '_blank')}
                     />
                 </div>
 
