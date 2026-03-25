@@ -1,5 +1,9 @@
 import { config } from './config';
 import { blockCache, cacheBlock } from './controllers/cache';
+import { ExtendedCommitInfo } from "cosmjs-types/tendermint/abci/types";
+import { VoteExtension } from './proto/vote_ext';
+import { fromBase64 } from "@cosmjs/encoding";
+
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 dayjs.extend(utc);
@@ -67,6 +71,48 @@ interface JsonRpcEvent {
     };
 }
 
+interface TxResult {
+    height: string;
+    tx: string; // Base64-encoded tx
+    result: {
+        code: number;
+        log: string;
+        codespace?: string;
+    };
+}
+
+interface TxEventData {
+    type: 'tendermint/event/Tx';
+    value: {
+        TxResult: TxResult;
+    };
+}
+
+interface JsonRpcTxEvent {
+    jsonrpc: '2.0';
+    id?: string | number;
+    result?: {
+        data?: TxEventData;
+        query?: string;
+    };
+    error?: {
+        code: number;
+        message: string;
+        data?: string;
+    };
+    events?: Record<string, string[]>;
+}
+
+function isBlockEvent(event: any): event is JsonRpcEvent & {
+    result: { data: NewBlockEventData };
+} {
+    return event?.result?.data?.type === 'tendermint/event/NewBlock';
+}
+
+function isTxEvent(event: any): event is JsonRpcTxEvent {
+    return event?.result?.data?.type === 'tendermint/event/Tx';
+}
+
 let lastBlockTime: dayjs.Dayjs | null = null;
 let totalBlockTimeDiff = 0;
 let blockIntervalCount = 0;
@@ -89,7 +135,7 @@ export function connectWS(): void {
     ws.on('open', () => {
         logger.info('[WebSocket] Connected');
 
-        const subscribeMessage: JsonRpcRequest = {
+        var subscribeMessage: JsonRpcRequest = {
             jsonrpc: '2.0',
             method: 'subscribe',
             id: '1',
@@ -99,14 +145,24 @@ export function connectWS(): void {
         };
 
         ws?.send(JSON.stringify(subscribeMessage));
+
+        subscribeMessage = {
+            jsonrpc: '2.0',
+            method: 'subscribe',
+            id: '2',
+            params: {
+                query: "tm.event='Tx'",
+            },
+        };
+
+        ws?.send(JSON.stringify(subscribeMessage));
     });
 
     ws.on('message', async (data: WebSocket.Data) => {
         try {
-            const message = JSON.parse(data.toString()) as JsonRpcEvent;
-
-            if (message.result?.data?.type === 'tendermint/event/NewBlock') {
-                const block = message.result.data.value.block;
+            const response = JSON.parse(data.toString());
+            if (isBlockEvent(response)) {
+                const block = response.result.data.value.block;
                 const blockTime = dayjs(block.header.time).utc().format('YYYY-MM-DD HH:mm:ss.SSSSSSSSS');
 
                 // --- Calculate time difference from last block ---
@@ -152,6 +208,13 @@ export function connectWS(): void {
                 })
 
                 broadcastNetworkStats();
+            } else if (isTxEvent(response)) {
+                const txBase64 = response.result!.data!.value.TxResult.tx;
+                const txBytes = Buffer.from(txBase64, "base64");
+
+                const info = ExtendedCommitInfo.decode(txBytes);
+
+                console.log("Decoded VoteExtension:", info);
             }
         } catch (error) {
             logger.error('[WebSocket] Message parse error:', error);
