@@ -68,9 +68,10 @@ type Block = {
     transactions: number;
 
     evidence_hash: string;
+
+    signatures: string;
+    result_finalize_block: any;
 };
-
-
 
 export class Database {
     private client: ReturnType<typeof createClient>;
@@ -365,7 +366,7 @@ ORDER BY blockTime DESC;
 
     async getBlocksPaginated(
         page: number = 1,
-        limit: number = 500
+        limit: number = 25
     ): Promise<Block[]> {
         const offset = (page - 1) * limit;
         const query = `
@@ -385,6 +386,33 @@ ORDER BY blockTime DESC;
             return data as Block[];
         } catch (err) {
             logger.error(`Failed to fetch paginated blocks: ${err}`);
+            throw err;
+        }
+    }
+
+    async getBlock(
+        height: number
+    ): Promise<Block> {
+        const query = `
+        SELECT *
+        FROM blocks
+        WHERE height = ${height}
+        `;
+
+        try {
+            const result = await this.client.query({
+                query,
+                format: 'JSONEachRow',
+            });
+
+            const data = await result.json();
+            if (data.length === 0) {
+                throw new Error(`Block with height ${height} not found`);
+            }
+
+            return data[0] as Block;
+        } catch (err) {
+            logger.error(`Failed to fetch single block: ${err} `);
             throw err;
         }
     }

@@ -58,10 +58,14 @@ CREATE TABLE IF NOT EXISTS blocks (
 
     transactions UInt64,
     
-    evidence_hash String
+    evidence_hash String,
+
+    signatures String,
+    
+    result_finalize_block JSON
 )
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(time)             
 ORDER BY (time, height)                 
-TTL time + INTERVAL 1 YEAR DELETE; 
+TTL time + INTERVAL 3 MONTH DELETE; 
 

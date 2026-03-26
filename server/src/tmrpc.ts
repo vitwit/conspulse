@@ -41,6 +41,13 @@ interface BlockHeader {
     [key: string]: any;
 }
 
+interface BlockLastCommit {
+    height: string;
+    round: number;
+    signatures: any[];
+    [key: string]: any;
+}
+
 interface BlockData {
     txs?: string[]; // Base64-encoded transaction strings
 }
@@ -48,12 +55,14 @@ interface BlockData {
 interface Block {
     header: BlockHeader;
     data: BlockData;
+    last_commit: BlockLastCommit;
 }
 
 interface NewBlockEventData {
     type: 'tendermint/event/NewBlock';
     value: {
         block: Block;
+        result_finalize_block: any;
     };
 }
 
@@ -163,6 +172,7 @@ export function connectWS(): void {
             const response = JSON.parse(data.toString());
             if (isBlockEvent(response)) {
                 const block = response.result.data.value.block;
+                const block_events = response.result.data.value.result_finalize_block;
                 const blockTime = dayjs(block.header.time).utc().format('YYYY-MM-DD HH:mm:ss.SSSSSSSSS');
 
                 // --- Calculate time difference from last block ---
@@ -204,7 +214,8 @@ export function connectWS(): void {
                     transactions: block.data.txs?.length || 0,
                     validators_hash: block.header['validators_hash'],
                     time: blockTime,
-
+                    signatures: JSON.stringify(block.last_commit.signatures),
+                    result_finalize_block: block_events,
                 })
 
                 broadcastNetworkStats();
@@ -213,11 +224,9 @@ export function connectWS(): void {
                 const txBytes = Buffer.from(txBase64, "base64");
 
                 const info = ExtendedCommitInfo.decode(txBytes);
-
-                console.log("Decoded VoteExtension:", info);
             }
-        } catch (error) {
-            logger.error('[WebSocket] Message parse error:', error);
+        } catch (err) {
+            logger.error(`[WebSocket] Message parse error: ${err} ${data}'`);
         }
     });
 
@@ -230,6 +239,17 @@ export function connectWS(): void {
         logger.error(`[WebSocket] Error: ${error.message}`);
         ws?.close(); // Ensure reconnect
     });
+}
+
+// Used to console bigInt included json without any issue
+function replacer(key: string, value: any) {
+    if (typeof value === 'bigint') {
+        return value.toString(); // convert BigInt to string
+    }
+    if (Buffer.isBuffer(value) || value instanceof Uint8Array) {
+        return Buffer.from(value).toString('hex'); // convert Buffer to hex
+    }
+    return value;
 }
 
 function scheduleReconnect(delay: number = 3000): void {
