@@ -6,7 +6,7 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
-import { MilestoneProposition } from "./milestone";
+import { MilestoneProposition } from "../milestone/milestone";
 
 export const protobufPackage = "heimdallv2.sidetxs";
 
@@ -152,19 +152,19 @@ export const VoteExtension: MessageFns<VoteExtension> = {
       blockHash: isSet(object.blockHash)
         ? bytesFromBase64(object.blockHash)
         : isSet(object.block_hash)
-          ? bytesFromBase64(object.block_hash)
-          : new Uint8Array(0),
+        ? bytesFromBase64(object.block_hash)
+        : new Uint8Array(0),
       height: isSet(object.height) ? globalThis.Number(object.height) : 0,
       sideTxResponses: globalThis.Array.isArray(object?.sideTxResponses)
         ? object.sideTxResponses.map((e: any) => SideTxResponse.fromJSON(e))
         : globalThis.Array.isArray(object?.side_tx_responses)
-          ? object.side_tx_responses.map((e: any) => SideTxResponse.fromJSON(e))
-          : [],
+        ? object.side_tx_responses.map((e: any) => SideTxResponse.fromJSON(e))
+        : [],
       milestoneProposition: isSet(object.milestoneProposition)
         ? MilestoneProposition.fromJSON(object.milestoneProposition)
         : isSet(object.milestone_proposition)
-          ? MilestoneProposition.fromJSON(object.milestone_proposition)
-          : undefined,
+        ? MilestoneProposition.fromJSON(object.milestone_proposition)
+        : undefined,
     };
   },
 
@@ -252,8 +252,8 @@ export const SideTxResponse: MessageFns<SideTxResponse> = {
       txHash: isSet(object.txHash)
         ? bytesFromBase64(object.txHash)
         : isSet(object.tx_hash)
-          ? bytesFromBase64(object.tx_hash)
-          : new Uint8Array(0),
+        ? bytesFromBase64(object.tx_hash)
+        : new Uint8Array(0),
       result: isSet(object.result) ? voteFromJSON(object.result) : 0,
     };
   },

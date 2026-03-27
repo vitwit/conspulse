@@ -62,10 +62,32 @@ CREATE TABLE IF NOT EXISTS blocks (
 
     signatures String,
     
-    result_finalize_block JSON
+    result_finalize_block JSON,
+
+    sidetx_commits JSON,
+    sidetx_summary JSON
 )
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(time)             
 ORDER BY (time, height)                 
 TTL time + INTERVAL 3 MONTH DELETE; 
+
+CREATE TABLE IF NOT EXISTS transactions (
+    txhash String,
+    height UInt64,
+    time DateTime64(9, 'UTC'),
+    sender String,
+    data String,
+    raw_log String DEFAULT '',
+    raw_tx String,
+    messages Array(JSON),
+    events String DEFAULT '[]',
+    gas_wanted UInt64,
+    gas_used UInt64,
+    fee String,
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(time)
+ORDER BY (height, txhash)
+TTL time + INTERVAL 3 MONTH DELETE;
 

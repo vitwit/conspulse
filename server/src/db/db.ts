@@ -71,7 +71,25 @@ type Block = {
 
     signatures: string;
     result_finalize_block: any;
+
+    sidetx_commits?: any;
+    sidetx_summary?: any;
 };
+
+type Transaction = {
+    txhash: string;
+    height: number;
+    time: string; // ISO
+    sender: string;
+    data: string;
+    raw_log: string;
+    raw_tx: string;
+    messages: any[];
+    events: any[];
+    gas_wanted: number;
+    gas_used: number;
+    fee: string;
+}
 
 export class Database {
     private client: ReturnType<typeof createClient>;
@@ -348,7 +366,6 @@ ORDER BY blockTime DESC;
         }
     }
 
-
     async insertBlock(block: Block): Promise<void> {
         try {
             await this.client.insert({
@@ -360,6 +377,32 @@ ORDER BY blockTime DESC;
             logger.debug(`Block inserted: height=${block.height}, chain_id=${block.chain_id}`);
         } catch (err) {
             logger.error(`Failed to insert block: ${err}`);
+            throw err;
+        }
+    }
+
+    async updateSideTxInfo(height: number, commits: any, summary: any): Promise<void> {
+        try {
+            const query = `
+      ALTER TABLE blocks
+      UPDATE 
+        sidetx_commits = {commits:String},
+        sidetx_summary = {summary:String}
+      WHERE height = {height:UInt64}
+    `;
+
+            await this.client.query({
+                query,
+                query_params: {
+                    height,
+                    commits: JSON.stringify(commits),
+                    summary: JSON.stringify(summary),
+                },
+            });
+
+            logger.debug(`Block updated with side txs info: ${height}`);
+        } catch (err) {
+            logger.error(`Failed updating side txs info in block ${height}: ${err}`);
             throw err;
         }
     }
@@ -413,6 +456,74 @@ ORDER BY blockTime DESC;
             return data[0] as Block;
         } catch (err) {
             logger.error(`Failed to fetch single block: ${err} `);
+            throw err;
+        }
+    }
+
+    async insertTransaction(tx: Transaction): Promise<void> {
+        try {
+            await this.client.insert({
+                table: 'transactions',
+                values: [tx],
+                format: 'JSONEachRow',
+            });
+
+            logger.debug(`Transaction inserted: tx=${tx.txhash}, height=${tx.height}`);
+        } catch (err) {
+            logger.error(`Failed to insert transaction: ${err}`);
+            throw err;
+        }
+    }
+
+    async getTxsPaginated(
+        page: number = 1,
+        limit: number = 10
+    ): Promise<Transaction[]> {
+        const offset = (page - 1) * limit;
+        const query = `
+        SELECT *
+        FROM transactions
+        ORDER BY height DESC, time DESC
+        LIMIT ${limit} OFFSET ${offset}
+    `;
+
+        try {
+            const result = await this.client.query({
+                query,
+                format: 'JSONEachRow',
+            });
+
+            const data = await result.json();
+            return data as Transaction[];
+        } catch (err) {
+            logger.error(`Failed to fetch paginated transactions: ${err}`);
+            throw err;
+        }
+    }
+
+    async getTransaction(
+        txhash: string
+    ): Promise<Transaction> {
+        const query = `
+        SELECT *
+        FROM transactions
+        WHERE txhash = '${txhash}'
+        `;
+
+        try {
+            const result = await this.client.query({
+                query,
+                format: 'JSONEachRow',
+            });
+
+            const data = await result.json();
+            if (data.length === 0) {
+                throw new Error(`Transaction with txhash ${txhash} not found`);
+            }
+
+            return data[0] as Transaction;
+        } catch (err) {
+            logger.error(`Failed to fetch transaction: ${err} `);
             throw err;
         }
     }
