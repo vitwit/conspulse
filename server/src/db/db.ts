@@ -527,4 +527,27 @@ ORDER BY blockTime DESC;
             throw err;
         }
     }
+
+    async getTxsByHeight(
+        height: number
+    ): Promise<Transaction[]> {
+        const query = `
+        SELECT *
+        FROM transactions
+        WHERE height = '${height}'
+        `;
+
+        try {
+            const result = await this.client.query({
+                query,
+                format: 'JSONEachRow',
+            });
+
+            const data = await result.json();
+            return data as Transaction[];
+        } catch (err) {
+            logger.error(`Failed to fetch transactions for block ${height}: ${err} `);
+            throw err;
+        }
+    }
 }

@@ -6,11 +6,16 @@ export const getTransactions = async (
     res: any
 ) => {
     try {
-        const page = parseInt(req.query.page || '1', 10);
-        const limit = parseInt(req.query.limit || '10', 10);
+        const height = req.query.height;
+        let txs;
 
-        const txs = await db.getTxsPaginated(page, limit);
-
+        if (height) {
+            txs = await db.getTxsByHeight(parseInt(height, 10));
+        } else {
+            const page = parseInt(req.query.page || '1', 10);
+            const limit = parseInt(req.query.limit || '10', 10);
+            txs = await db.getTxsPaginated(page, limit);
+        }
         return res.status(200).json({
             txs
         });
