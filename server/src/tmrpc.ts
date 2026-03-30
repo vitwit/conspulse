@@ -359,7 +359,7 @@ async function handleSideTx(txBytes: Uint8Array, height: number) {
         const ext = ExtendedCommitInfo.decode(txBytes);
 
         const commitJson = buildCommitJSON(height, ext);
-        const summaryJson = buildSummaryJSON(height, ext);
+        const summaryJson = buildSummaryJSON(ext);
 
         await db.updateSideTxInfo(height, commitJson, summaryJson);
     } catch (err) {
@@ -448,7 +448,7 @@ export function buildCommitJSON(height: number, ext: ExtendedCommitInfo): Commit
     };
 }
 
-export function buildSummaryJSON(height: number, ext: ExtendedCommitInfo): SummaryData {
+export function buildSummaryJSON(ext: ExtendedCommitInfo): SummaryData {
     let totalPower = 0;
 
     for (const v of ext.votes) {
