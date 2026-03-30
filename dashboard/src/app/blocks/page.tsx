@@ -1,0 +1,119 @@
+"use client";
+
+import React, { useEffect, useState, useCallback } from "react";
+import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
+import BlocksTable from "./BlocksTable";
+import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+
+export default function BlocksPage() {
+  const [blocks, setBlocks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(25);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const fetchBlocks = useCallback(async (pageNum: number, isAuto = false) => {
+    if (!isAuto) setLoading(true);
+    else setIsRefreshing(true);
+    
+    setError(null);
+    try {
+      const res = await fetch(`${API_URL}/blocks?page=${pageNum}&limit=${limit}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setBlocks(data.blocks || []);
+    } catch (err: any) {
+      setError(err.message || "Unknown error");
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [limit]);
+
+  useEffect(() => {
+    fetchBlocks(page);
+    
+    // Auto refresh every 10 seconds for the first page
+    let interval: NodeJS.Timeout;
+    if (page === 1) {
+      interval = setInterval(() => {
+        fetchBlocks(1, true);
+      }, 10000);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [page, fetchBlocks]);
+
+  const handlePrevPage = () => {
+    if (page > 1 && !loading) setPage(page - 1);
+  };
+
+  const handleNextPage = () => {
+    if (!loading && blocks.length === limit) setPage(page + 1);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0e1014] flex flex-col font-sans">
+      <Navbar shrink={false} />
+      
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-8">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+              Recent Blocks
+              {isRefreshing && (
+                <RefreshCw size={18} className="text-green-500 animate-spin" />
+              )}
+            </h1>
+            <p className="text-gray-400 text-sm mt-1">
+              Real-time block production on the network
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-2 bg-[#1a1e24] p-1 rounded-lg border border-[#2a2f3a]">
+             <button
+              onClick={handlePrevPage}
+              disabled={page === 1 || loading}
+              className="p-2 rounded-md hover:bg-[#2a2f3a] disabled:opacity-30 disabled:cursor-not-allowed text-gray-400 transition-colors"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <span className="px-4 text-white font-mono font-bold border-x border-[#2a2f3a]">
+              Page {page}
+            </span>
+            <button
+              onClick={handleNextPage}
+              disabled={loading || blocks.length < limit}
+              className="p-2 rounded-md hover:bg-[#2a2f3a] disabled:opacity-30 disabled:cursor-not-allowed text-gray-400 transition-colors"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-4 mb-6 text-red-400">
+            Error loading blocks: {error}
+          </div>
+        )}
+
+        {loading && blocks.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+             <div className="w-12 h-12 border-4 border-green-500/20 border-t-green-500 rounded-full animate-spin"></div>
+             <p className="text-gray-500">Fetching latest blocks...</p>
+          </div>
+        ) : (
+          <BlocksTable blocks={blocks} />
+        )}
+      </main>
+      
+      <Footer />
+    </div>
+  );
+}

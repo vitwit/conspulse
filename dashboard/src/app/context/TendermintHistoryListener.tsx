@@ -73,6 +73,7 @@ export const TendermintHistoryProvider: React.FC<{ children: React.ReactNode }> 
   const [state, setState] = useState<ConsensusState | null>(null);
   const pendingVotesRef = useRef<Map<number, PendingVote[]>>(new Map());
   const inFlightValidatorFetch = useRef<AbortController | null>(null);
+  const lastFetchedHeightRef = useRef<number>(0);
 
   const subscribeQueries = [
     { query: "tm.event='NewBlock'", id: "nb" },
@@ -115,7 +116,22 @@ export const TendermintHistoryProvider: React.FC<{ children: React.ReactNode }> 
 
             (async () => {
               try {
+                // Rate limit: only fetch validator set if height moved significantly
+                // or if we don't have any validators yet.
+                const shouldFetch = !state?.validators?.length || 
+                                   (height - lastFetchedHeightRef.current >= 20);
+
+                if (!shouldFetch) {
+                  // Re-use existing validators but update height
+                  setState(prev => prev && prev.height === height ? {
+                    ...prev,
+                    validators: prev.validators.map(v => ({ ...v, prevote: false, precommit: false }))
+                  } : prev);
+                  return;
+                }
+
                 const validators = await fetchValidatorSet(height, controller.signal);
+                lastFetchedHeightRef.current = height;
 
                 // replay pending votes for this height
                 let updatedValidators = validators.map(v => ({ ...v }));
