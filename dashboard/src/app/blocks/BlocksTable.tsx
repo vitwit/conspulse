@@ -4,7 +4,6 @@ import React from "react";
 import Link from "next/link";
 import { Clock } from "lucide-react";
 import ShortName from "../components/ShortName";
-import ShortProposerName from "../components/ShortProposer";
 import moment from "moment";
 
 interface Block {
@@ -20,6 +19,12 @@ interface Block {
 
 interface BlocksTableProps {
   blocks: Block[];
+}
+
+// Shorten address without any API call
+function shortAddress(address: string, chars = 8): string {
+  if (!address) return "—";
+  return `${address.substring(0, chars)}...${address.substring(address.length - 4)}`;
 }
 
 const BlocksTable: React.FC<BlocksTableProps> = ({ blocks }) => {
@@ -45,13 +50,11 @@ const BlocksTable: React.FC<BlocksTableProps> = ({ blocks }) => {
             </tr>
           ) : (
             blocks.map((block) => (
-              <tr
-                key={block.height}
-                className="hover:bg-[#232931] transition-colors group"
-              >
+              <tr key={block.height} className="hover:bg-[#232931] transition-colors group">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <Link
                     href={`/blocks/${block.height}`}
+                    prefetch={false}
                     className="text-green-400 font-mono font-bold hover:underline"
                   >
                     {block.height.toLocaleString()}
@@ -62,11 +65,11 @@ const BlocksTable: React.FC<BlocksTableProps> = ({ blocks }) => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-[10px] text-white">
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-[10px] text-white font-bold">
                       {block.proposer_address.substring(0, 2).toUpperCase()}
                     </div>
-                    <span className="text-gray-200">
-                      <ShortProposerName value={block.proposer_address} maxLength={10} />
+                    <span className="text-gray-200 font-mono text-xs">
+                      {shortAddress(block.proposer_address)}
                     </span>
                   </div>
                 </td>

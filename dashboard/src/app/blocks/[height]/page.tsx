@@ -61,7 +61,7 @@ export default function BlockDetailPage() {
         try {
             // Workaround: the backend doesn't support fetching transactions by block height,
             // so we fetch the most recent 250 transactions and filter by height.
-            const res = await fetch(`${API_URL}/txs?page=1&limit=250`);
+            const res = await fetch(`${API_URL}/txs?page=1&limit=2`);
             if (res.ok) {
                 const data = await res.json();
                 const filteredTxs = (data.txs || []).filter((tx: any) => tx.height === Number(height));
