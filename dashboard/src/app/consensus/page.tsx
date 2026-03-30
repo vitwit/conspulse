@@ -1,16 +1,17 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback, Suspense } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { useTendermint } from "../context/TendermintListener";
 import { useTendermintHistory, ValidatorInfo } from "../context/TendermintHistoryListener";
+import { useSearchParams, useRouter } from "next/navigation";
 import { SupportUS } from "../components/SupportUs";
 import { useWebSocket } from "../context/WebsocketContext";
 import { Stats } from "../types/ws";
 import CopyButton from "../components/CopyButton";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faClipboard, faCheck } from '@fortawesome/free-solid-svg-icons';
+import { faClipboard, faCheck, faSearch, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
 const NETWORK_NAME = process.env.NEXT_PUBLIC_NETWORK_NAME || "";
@@ -43,6 +44,14 @@ function timeAgo(date: Date | null) {
 type AccentColor = "blue" | "green" | "yellow" | "purple";
 
 export default function Home() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0f1115] text-white flex items-center justify-center">Loading...</div>}>
+      <ConsensusStatePage />
+    </Suspense>
+  );
+}
+
+function ConsensusStatePage() {
   const [consensus, setConsensus] = useState<any>(null);
   const [validators, setValidators] = useState<ValidatorInfo[]>([]);
   const [timer, setTimer] = useState(1);
@@ -58,12 +67,19 @@ export default function Home() {
   const [dumpLoading, setDumpLoading] = useState(false);
   const [dumpError, setDumpError] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const heightParam = searchParams.get("height");
+
+  const [historicalEvent, setHistoricalEvent] = useState<any>(null);
+  const [historicalHistory, setHistoricalHistory] = useState<any>(null);
 
   const eventRaw = useTendermint();
   const historyRaw = useTendermintHistory();
 
-  const event = paused ? null : eventRaw;
-  const history = paused ? null : historyRaw;
+  const event = heightParam ? historicalEvent : (paused ? null : eventRaw);
+  const history = heightParam ? historicalHistory : (paused ? null : historyRaw);
 
   const [currentStep, setCurrentStep] = useState<string>("");
   const [height, setHeight] = useState<number>(0);
@@ -88,9 +104,30 @@ export default function Home() {
     }
   }, [history?.validators]);
 
+  useEffect(() => {
+    if (!heightParam) {
+      setSearchInput("");
+      setHistoricalEvent(null);
+      setHistoricalHistory(null);
+    } else {
+      setHeight(Number(heightParam));
+      setSearchInput(heightParam);
+      // Clear old historical data to force a fresh fetch state
+      setHistoricalEvent(null);
+      setHistoricalHistory(null);
+      setValidators([]);
+      setCurrentStep("Loading...");
+      setProgressFill(0);
+    }
+  }, [heightParam]);
+
   const [lastBlockTime, setLastBlockTime] = useState(new Date());
   useEffect(() => {
     if (!event) return;
+    if (event.step) {
+        if (event.step === "Commit") setCurrentStep("Finalized");
+        else setCurrentStep(event.step);
+    }
     switch (event.step) {
       case "NewHeight":
         setProgressFill(25);
@@ -132,15 +169,126 @@ export default function Home() {
 
   const fetchData = async () => {
     try {
-      const consensusRes = await fetch(`${RPC_URL}/consensus_state`);
+      const targetHeight = heightParam ? Number(heightParam) : null;
+      const url = targetHeight
+        ? `${RPC_URL}/consensus_state?height=${targetHeight}`
+        : `${RPC_URL}/consensus_state`;
+      const consensusRes = await fetch(url);
       const consensusData = await consensusRes.json();
+      
       setConsensus(consensusData.result.round_state);
       setProposer(consensusData.result.round_state.proposer?.address || null);
-      const { height } = parseHeightRoundStep(consensusData.result.round_state["height/round/step"] || "");
-      if (prevConsensus && prevHeight && height === prevHeight + 1) {
-      } else if (height > 1) {
+
+      const stateStr = consensusData.result.round_state["height/round/step"] || "";
+      const [h, r, s] = stateStr.split("/");
+      const rpcHeight = Number(h);
+      const currentRound = Number(r);
+      const currentStepNum = Number(s);
+
+      // In historical mode, we should stick to the targetHeight we searched for.
+      const displayHeight = targetHeight || rpcHeight;
+      setHeight(displayHeight);
+      setRound(currentRound);
+
+      // Map Tendermint numeric steps to event names
+      let stepName = "";
+      switch (currentStepNum) {
+        case 0: stepName = "NewHeight"; break;
+        case 1: stepName = "NewRound"; break;
+        case 2: stepName = "Propose"; break;
+        case 3:
+        case 4: stepName = "Prevote"; break;
+        case 5:
+        case 6: stepName = "Precommit"; break;
+        case 7: stepName = "Commit"; break;
+      }
+
+      // Finalization Logic: 
+      // If we are searching for height H, and RPC reports height > H, OR Step is Commit(7)/NewHeight(0)
+      const isFinalizedHistorical = targetHeight && (rpcHeight > targetHeight || currentStepNum === 7 || currentStepNum === 0);
+      if (isFinalizedHistorical) {
+        stepName = "Commit";
+      }
+
+      if (targetHeight) {
+        // Fetch signatures from block H+1 to show votes for block H
+        let votedAddresses: string[] = [];
         try {
-          const blockRes = await fetch(`${RPC_URL}/block?height=${height - 1}`);
+          const nextBlockRes = await fetch(`${RPC_URL}/block?height=${targetHeight + 1}`);
+          if (nextBlockRes.ok) {
+            const nextBlockData = await nextBlockRes.json();
+            const signatures = nextBlockData?.result?.block?.last_commit?.signatures || 
+                               nextBlockData?.result?.block?.last_commit?.commit_sig || [];
+            votedAddresses = signatures
+              .map((s: any) => (s.validator_address || s.address)?.toUpperCase())
+              .filter(Boolean);
+          }
+        } catch (err) {
+          console.warn("Could not fetch next block for signatures:", err);
+        }
+
+        try {
+          const dumpUrl = `${RPC_URL}/dump_consensus_state?height=${targetHeight}`;
+          const dumpRes = await fetch(dumpUrl);
+          if (dumpRes.ok) {
+            const dumpData = await dumpRes.json();
+            setDumpConsensus(dumpData);
+          }
+        } catch (err) {
+          console.error("Failed to fetch dump_consensus for height:", targetHeight, err);
+        }
+
+        setHistoricalEvent({
+          type: "Step",
+          step: stepName,
+          height: displayHeight,
+          round: currentRound,
+          stepValue: currentStepNum
+        });
+        
+        if (stepName === "Commit") {
+          setCurrentStep("Finalized");
+          setProgressFill(100);
+        }
+
+        try {
+          const perPage = 100;
+          let page = 1;
+          let allValidators: ValidatorInfo[] = [];
+          for (;;) {
+            const valUrl = `${RPC_URL}/validators?height=${targetHeight}&per_page=${perPage}&page=${page}`;
+            const valRes = await fetch(valUrl);
+            const valData = await valRes.json();
+            const vals = valData?.result?.validators ?? [];
+            const mapped: ValidatorInfo[] = vals.map((v: any) => {
+              const addr = v.address.toUpperCase();
+              const voted = votedAddresses.includes(addr);
+              return {
+                address: addr,
+                votingPower: Number(v.voting_power),
+                prevote: voted, 
+                precommit: voted,
+              };
+            });
+            allValidators = allValidators.concat(mapped);
+            if (vals.length < perPage) break;
+            page += 1;
+          }
+          setValidators(allValidators);
+          setHistoricalHistory({
+            height: displayHeight,
+            round: currentRound,
+            validators: allValidators
+          });
+        } catch (err) {
+          console.error("Failed to fetch validators for height:", targetHeight, err);
+        }
+      }
+
+      if (prevConsensus && prevHeight && displayHeight === prevHeight + 1) {
+      } else if (displayHeight > 1) {
+        try {
+          const blockRes = await fetch(`${RPC_URL}/block?height=${displayHeight - 1}`);
           const blockData = await blockRes.json();
           const header = blockData.result.block.header;
           setChainId(header.chain_id);
@@ -155,7 +303,7 @@ export default function Home() {
         chain_id: consensusData.result.round_state.chain_id || chainId,
         time: consensusData.result.round_state.start_time || null,
       });
-      setPrevHeight(height);
+      setPrevHeight(displayHeight);
     } catch {
       setConsensus(null);
       setChainId(null);
@@ -163,7 +311,7 @@ export default function Home() {
       setPrevConsensus(null);
       setPrevHeight(null);
     } finally {
-      setTimer(1);
+      if (!heightParam) setTimer(1);
     }
   };
 
@@ -172,9 +320,9 @@ export default function Home() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, []);
+  }, [heightParam]);
   useEffect(() => {
-    if (paused) return;
+    if (paused || heightParam) return;
     if (timer === 0) {
       fetchData();
       return;
@@ -266,7 +414,11 @@ export default function Home() {
     setDumpError(null);
 
     try {
-      const res = await fetch(`${RPC_URL}/dump_consensus_state`);
+      const activeHeight = heightParam || null;
+      const url = activeHeight
+        ? `${RPC_URL}/dump_consensus_state?height=${activeHeight}`
+        : `${RPC_URL}/dump_consensus_state`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setDumpConsensus(data);
@@ -275,13 +427,14 @@ export default function Home() {
     } finally {
       dumpLoadingRef.current = false;
     }
-  }, []);
+  }, [heightParam]);
 
 
   useEffect(() => {
+    if (heightParam) return;
     if (paused) return;
     fetchDumpConsensus();
-  }, [height, paused, fetchDumpConsensus]);
+  }, [height, paused, fetchDumpConsensus, heightParam]);
 
 
   const cards: { label: string; value: string | number; accent: AccentColor }[] = [
@@ -319,6 +472,15 @@ export default function Home() {
         <section className="p-4 sm:p-8 mx-auto bg-[#1a1e24] rounded-xl shadow-lg">
           <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              {heightParam && (
+                <button
+                  onClick={() => router.push("/consensus")}
+                  className="mr-2 p-2 text-gray-400 hover:text-white transition-colors"
+                  title="Back to live consensus"
+                >
+                  <FontAwesomeIcon icon={faArrowLeft} size="lg" />
+                </button>
+              )}
               <h1 className="text-2xl font-bold text-white">Consensus State</h1>
 
               {NETWORK_NAME && (
@@ -328,33 +490,63 @@ export default function Home() {
               )}
             </div>
 
-            <button
-              onClick={() => {
-                if (paused) {
-                  setPaused(false);
-                  fetchData();
-                } else {
-                  setPaused(true);
-                }
-              }}
-              className={`px-3 py-1 rounded font-semibold hover:cursor-pointer ${paused ? "bg-green-700 hover:bg-green-600" : "bg-red-700 hover:bg-red-600"
-                }`}
-            >
-              {paused ? "Resume" : "Pause"}
-            </button>
+            <div className="flex items-center gap-4">
+              <div className="relative group">
+                <input
+                  type="text"
+                  placeholder="Search by height..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && searchInput) {
+                      router.push(`/consensus?height=${searchInput}`);
+                    }
+                  }}
+                  className="bg-[#0f1115] border border-gray-700 rounded-lg px-4 py-1.5 pl-10 text-sm focus:outline-none focus:border-blue-500 transition-all w-48 sm:w-64"
+                />
+                <FontAwesomeIcon
+                  icon={faSearch}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors pointer-events-none"
+                />
+                <button
+                  onClick={() => searchInput && router.push(`/consensus?height=${searchInput}`)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-xs bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded transition-colors"
+                >
+                  Search
+                </button>
+              </div>
+
+              {!heightParam && (
+                <button
+                  onClick={() => {
+                    if (paused) {
+                      setPaused(false);
+                      fetchData();
+                    } else {
+                      setPaused(true);
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded font-semibold hover:cursor-pointer transition-colors ${paused ? "bg-green-700 hover:bg-green-600 text-white" : "bg-red-700 hover:bg-red-600 text-white"
+                    }`}
+                >
+                  {paused ? "Resume" : "Pause"}
+                </button>
+              )}
+            </div>
           </div>
 
 
-          {/* Summary Section */}
           <div className="mx-auto mb-8">
-            <h2 className="text-lg font-bold mb-2 text-cyan-300">
-              Consensus Progress for Current Block{height ? ` (${height.toLocaleString()})` : ""}
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold text-cyan-300">
+                Consensus Progress for {heightParam ? "Historical" : "Current"} Block{height ? ` (${height.toLocaleString()})` : ""}
+              </h2>
+              <span className="text-sm font-semibold text-white bg-blue-600/20 px-3 py-1 rounded border border-blue-500/30">{currentStep}</span>
+            </div>
             <div className="flex flex-col items-center w-full">
               <div className="relative w-full h-5 flex items-center">
                 <div className="absolute left-0 top-0 w-full h-3 bg-gray-700 rounded-full" />
 
-                <h1 className="z-10 text-sm font-semibold text-white">{currentStep}</h1>
                 <div
                   className={`absolute left-0 top-0 h-3 rounded-full transition-all duration-700 ${blockFlash ? "ring-4 ring-blue-300" : ""
                     }`}
@@ -584,11 +776,13 @@ export default function Home() {
                       precommitted = typeof latestVoteSet.precommits?.[idx] === 'string' && !latestVoteSet.precommits[idx].startsWith('nil');
                     }
 
-                    const rowColor = favourites.includes(v.address)
-                      ? "bg-cyan-900"
-                      : voted
-                        ? "bg-green-900"
-                        : "bg-grey-900";
+                    const rowColor = heightParam
+                      ? (idx % 2 === 0 ? "bg-[#1a1e24]" : "bg-[#21262d]")
+                      : favourites.includes(v.address)
+                        ? "bg-cyan-900"
+                        : voted
+                          ? "bg-green-900"
+                          : "bg-gray-900";
 
                     return (
                       <tr key={v.address} className={`${rowColor} text-gray-100`}>

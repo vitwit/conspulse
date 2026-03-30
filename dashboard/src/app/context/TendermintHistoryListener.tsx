@@ -6,7 +6,9 @@ import React, {
   useEffect,
   useRef,
   useState,
+  Suspense,
 } from "react";
+import { useSearchParams } from "next/navigation";
 
 export interface ValidatorInfo {
   address: string;
@@ -64,13 +66,13 @@ async function fetchValidatorSet(
   return out;
 }
 
-export const TendermintHistoryProvider: React.FC<{ children: React.ReactNode }> = ({
+const TendermintHistoryContent: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const WS_URL = `${process.env.NEXT_PUBLIC_RPC_WEBSOCKET}/websocket`;
-
-  const socketRef = useRef<WebSocket | null>(null);
+  const searchParams = useSearchParams();
   const [state, setState] = useState<ConsensusState | null>(null);
+  const socketRef = useRef<WebSocket | null>(null);
   const pendingVotesRef = useRef<Map<number, PendingVote[]>>(new Map());
   const inFlightValidatorFetch = useRef<AbortController | null>(null);
 
@@ -79,6 +81,13 @@ export const TendermintHistoryProvider: React.FC<{ children: React.ReactNode }> 
     { query: "tm.event='Vote'", id: "vo" },
     { query: "tm.event='NewRoundStep'", id: "rs" },
   ];
+
+  const isHistorical = !!searchParams.get("height");
+  const isHistoricalRef = useRef(isHistorical);
+
+  useEffect(() => {
+    isHistoricalRef.current = isHistorical;
+  }, [isHistorical]);
 
   const openSocket = () => {
     const ws = new WebSocket(WS_URL);
@@ -91,6 +100,7 @@ export const TendermintHistoryProvider: React.FC<{ children: React.ReactNode }> 
     };
 
     ws.onmessage = (e: MessageEvent) => {
+      if (isHistoricalRef.current) return;
       try {
         const msg = JSON.parse(e.data);
         const type = msg?.result?.data?.type;
@@ -225,5 +235,13 @@ export const TendermintHistoryProvider: React.FC<{ children: React.ReactNode }> 
     <TendermintHistoryContext.Provider value={state}>
       {children}
     </TendermintHistoryContext.Provider>
+  );
+};
+
+export const TendermintHistoryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  return (
+    <Suspense fallback={null}>
+      <TendermintHistoryContent>{children}</TendermintHistoryContent>
+    </Suspense>
   );
 };
