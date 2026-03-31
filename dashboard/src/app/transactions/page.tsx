@@ -70,9 +70,6 @@ export default function TransactionsPage() {
               <Hash className="text-blue-500" size={24} />
               Transactions
             </h1>
-            <p className="text-gray-400 text-sm mt-1">
-              Real-time transaction monitoring and decoding
-            </p>
           </div>
 
           <div className="flex items-center gap-4">

@@ -413,10 +413,21 @@ ORDER BY blockTime DESC;
     ): Promise<Block[]> {
         const offset = (page - 1) * limit;
         const query = `
-        SELECT *
+        SELECT 
+            height, time, chain_id, proposer_address, data_hash, 
+            app_hash, consensus_hash, last_commit_hash, last_results_hash, 
+            validators_hash, next_validators_hash, transactions, 
+            evidence_hash, signatures, 
+            if(length(toString(sidetx_commits)) > 4, 'yes', '') as sidetx_commits,
+            if(length(toString(sidetx_summary)) > 4, 'yes', '') as sidetx_summary
         FROM blocks
+        WHERE height IN (
+            SELECT height
+            FROM blocks
+            ORDER BY time DESC, height DESC
+            LIMIT ${limit} OFFSET ${offset}
+        )
         ORDER BY time DESC, height DESC
-        LIMIT ${limit} OFFSET ${offset}
     `;
 
         try {
@@ -483,8 +494,12 @@ ORDER BY blockTime DESC;
         const query = `
         SELECT *
         FROM transactions
+        WHERE txhash IN (
+            SELECT txhash FROM transactions
+            ORDER BY height DESC, time DESC
+            LIMIT ${limit} OFFSET ${offset}
+        )
         ORDER BY height DESC, time DESC
-        LIMIT ${limit} OFFSET ${offset}
     `;
 
         try {
