@@ -72,6 +72,33 @@ function ConsensusStatePage() {
   const router = useRouter();
   const heightParam = searchParams.get("height");
 
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (errorMsg) {
+      const t = setTimeout(() => setErrorMsg(null), 5000);
+      return () => clearTimeout(t);
+    }
+  }, [errorMsg]);
+
+  const parseHeight = (val: string | null) => {
+    if (!val) return null;
+    const clean = val.replace(/,/g, "").trim();
+    if (!/^\d+$/.test(clean)) return NaN;
+    const num = Number(clean);
+    if (num <= 0) return NaN;
+    return num;
+  };
+
+  const handleSearch = useCallback(() => {
+    const numHeight = parseHeight(searchInput);
+    if (!numHeight || isNaN(numHeight)) {
+      setErrorMsg("Invalid height. Please enter numbers only.");
+      return;
+    }
+    router.push(`/consensus?height=${numHeight}`);
+  }, [searchInput, router]);
+
   const [historicalEvent, setHistoricalEvent] = useState<any>(null);
   const [historicalHistory, setHistoricalHistory] = useState<any>(null);
 
@@ -109,6 +136,8 @@ function ConsensusStatePage() {
       setSearchInput("");
       setHistoricalEvent(null);
       setHistoricalHistory(null);
+      setValidators(historyRaw?.validators || []);
+      setPaused(false);
     } else {
       setHeight(Number(heightParam));
       setSearchInput(heightParam);
@@ -169,142 +198,161 @@ function ConsensusStatePage() {
 
   const fetchData = async () => {
     try {
-      const targetHeight = heightParam ? Number(heightParam) : null;
-      const url = targetHeight
-        ? `${RPC_URL}/consensus_state?height=${targetHeight}`
-        : `${RPC_URL}/consensus_state`;
-      const consensusRes = await fetch(url);
-      const consensusData = await consensusRes.json();
-      
-      setConsensus(consensusData.result.round_state);
-      setProposer(consensusData.result.round_state.proposer?.address || null);
+      let targetHeight = parseHeight(heightParam);
+      let forceLive = false;
 
-      const stateStr = consensusData.result.round_state["height/round/step"] || "";
-      const [h, r, s] = stateStr.split("/");
-      const rpcHeight = Number(h);
-      const currentRound = Number(r);
-      const currentStepNum = Number(s);
-
-      // In historical mode, we should stick to the targetHeight we searched for.
-      const displayHeight = targetHeight || rpcHeight;
-      setHeight(displayHeight);
-      setRound(currentRound);
-
-      // Map Tendermint numeric steps to event names
-      let stepName = "";
-      switch (currentStepNum) {
-        case 0: stepName = "NewHeight"; break;
-        case 1: stepName = "NewRound"; break;
-        case 2: stepName = "Propose"; break;
-        case 3:
-        case 4: stepName = "Prevote"; break;
-        case 5:
-        case 6: stepName = "Precommit"; break;
-        case 7: stepName = "Commit"; break;
-      }
-
-      // Finalization Logic: 
-      // If we are searching for height H, and RPC reports height > H, OR Step is Commit(7)/NewHeight(0)
-      const isFinalizedHistorical = targetHeight && (rpcHeight > targetHeight || currentStepNum === 7 || currentStepNum === 0);
-      if (isFinalizedHistorical) {
-        stepName = "Commit";
+      if (heightParam && (targetHeight === null || isNaN(targetHeight))) {
+        setErrorMsg("Invalid height value provided in URL.");
+        forceLive = true;
+        targetHeight = null;
       }
 
       if (targetHeight) {
-        // Fetch signatures from block H+1 to show votes for block H
+        setConsensus(null);
+        setDumpConsensus(null);
+
+        let currentRound = 0;
         let votedAddresses: string[] = [];
+
         try {
-          const nextBlockRes = await fetch(`${RPC_URL}/block?height=${targetHeight + 1}`);
-          if (nextBlockRes.ok) {
-            const nextBlockData = await nextBlockRes.json();
-            const signatures = nextBlockData?.result?.block?.last_commit?.signatures || 
-                               nextBlockData?.result?.block?.last_commit?.commit_sig || [];
+          const commitRes = await fetch(`${RPC_URL}/commit?height=${targetHeight}`);
+          if (commitRes.ok) {
+            const commitData = await commitRes.json();
+            if (commitData.error) {
+              throw new Error(commitData.error.data || commitData.error.message || "API Error");
+            }
+            const header = commitData?.result?.signed_header?.header;
+            const commit = commitData?.result?.signed_header?.commit;
+
+            setChainId(header?.chain_id || null);
+            setLastBlockTime(header?.time ? new Date(header.time) : new Date());
+            setProposer(header?.proposer_address || null);
+
+            currentRound = Number(commit?.round || 0);
+            const signatures = commit?.signatures || [];
             votedAddresses = signatures
               .map((s: any) => (s.validator_address || s.address)?.toUpperCase())
               .filter(Boolean);
-          }
-        } catch (err) {
-          console.warn("Could not fetch next block for signatures:", err);
-        }
 
-        try {
-          const dumpUrl = `${RPC_URL}/dump_consensus_state?height=${targetHeight}`;
-          const dumpRes = await fetch(dumpUrl);
-          if (dumpRes.ok) {
-            const dumpData = await dumpRes.json();
-            setDumpConsensus(dumpData);
-          }
-        } catch (err) {
-          console.error("Failed to fetch dump_consensus for height:", targetHeight, err);
-        }
+            setHeight(targetHeight);
+            setRound(currentRound);
 
-        setHistoricalEvent({
-          type: "Step",
-          step: stepName,
-          height: displayHeight,
-          round: currentRound,
-          stepValue: currentStepNum
-        });
-        
-        if (stepName === "Commit") {
-          setCurrentStep("Finalized");
-          setProgressFill(100);
-        }
-
-        try {
-          const perPage = 100;
-          let page = 1;
-          let allValidators: ValidatorInfo[] = [];
-          for (;;) {
-            const valUrl = `${RPC_URL}/validators?height=${targetHeight}&per_page=${perPage}&page=${page}`;
-            const valRes = await fetch(valUrl);
-            const valData = await valRes.json();
-            const vals = valData?.result?.validators ?? [];
-            const mapped: ValidatorInfo[] = vals.map((v: any) => {
-              const addr = v.address.toUpperCase();
-              const voted = votedAddresses.includes(addr);
-              return {
-                address: addr,
-                votingPower: Number(v.voting_power),
-                prevote: voted, 
-                precommit: voted,
-              };
+            setHistoricalEvent({
+              type: "Step",
+              step: "Commit",
+              height: targetHeight,
+              round: currentRound,
+              stepValue: 7
             });
-            allValidators = allValidators.concat(mapped);
-            if (vals.length < perPage) break;
-            page += 1;
+
+            setCurrentStep("Finalized");
+            setProgressFill(100);
+
+            const perPage = 100;
+            let page = 1;
+            let allValidators: ValidatorInfo[] = [];
+            for (;;) {
+              const valUrl = `${RPC_URL}/validators?height=${targetHeight}&per_page=${perPage}&page=${page}`;
+              const valRes = await fetch(valUrl);
+              const valData = await valRes.json();
+              const vals = valData?.result?.validators ?? [];
+              const mapped: ValidatorInfo[] = vals.map((v: any) => {
+                const addr = v.address.toUpperCase();
+                const voted = votedAddresses.includes(addr);
+                return {
+                  address: addr,
+                  votingPower: Number(v.voting_power),
+                  prevote: voted, 
+                  precommit: voted,
+                };
+              });
+              allValidators = allValidators.concat(mapped);
+              if (vals.length < perPage) break;
+              page += 1;
+            }
+            setValidators(allValidators);
+          } else {
+            throw new Error(`Height ${targetHeight} might be in the future or not available.`);
           }
-          setValidators(allValidators);
-          setHistoricalHistory({
-            height: displayHeight,
-            round: currentRound,
-            validators: allValidators
-          });
-        } catch (err) {
-          console.error("Failed to fetch validators for height:", targetHeight, err);
+        } catch (err: any) {
+          console.error("Historical error:", err);
+          setErrorMsg(err.message || "Failed to fetch historical data.");
+          forceLive = true;
+          targetHeight = null;
         }
       }
 
-      if (prevConsensus && prevHeight && displayHeight === prevHeight + 1) {
-      } else if (displayHeight > 1) {
-        try {
-          const blockRes = await fetch(`${RPC_URL}/block?height=${displayHeight - 1}`);
-          const blockData = await blockRes.json();
-          const header = blockData.result.block.header;
-          setChainId(header.chain_id);
-          setLastBlockTime(new Date(header.time));
-        } catch {
+      if (!targetHeight || forceLive) {
+        const consensusRes = await fetch(`${RPC_URL}/consensus_state`);
+        const consensusData = await consensusRes.json();
+        
+        if (consensusData.error) throw new Error(consensusData.error.message);
+
+        setConsensus(consensusData.result.round_state);
+        setProposer(consensusData.result.round_state.proposer?.address || null);
+
+        const stateStr = consensusData.result.round_state["height/round/step"] || "";
+        const [h, r, s] = stateStr.split("/");
+        const rpcHeight = Number(h);
+        const currentRound = Number(r);
+        const currentStepNum = Number(s);
+
+        const displayHeight = rpcHeight;
+        setHeight(displayHeight);
+        setRound(currentRound);
+
+        if (prevConsensus && prevHeight && displayHeight === prevHeight + 1) {
+        } else if (displayHeight > 1) {
+          try {
+            const blockRes = await fetch(`${RPC_URL}/block?height=${displayHeight - 1}`);
+            const blockData = await blockRes.json();
+            const header = blockData.result.block.header;
+            setChainId(header.chain_id);
+            setLastBlockTime(new Date(header.time));
+          } catch {
+            setChainId(null);
+          }
+        } else {
           setChainId(null);
         }
-      } else {
-        setChainId(null);
+        setPrevConsensus({
+          chain_id: consensusData.result.round_state.chain_id || chainId,
+          time: consensusData.result.round_state.start_time || null,
+        });
+        setPrevHeight(displayHeight);
+
+        if (validators.length === 0) {
+           Promise.all([
+             fetch(`${RPC_URL}/validators?per_page=100&page=1`).then(r => r.json()).catch(() => null),
+             fetch(`${RPC_URL}/validators?per_page=100&page=2`).then(r => r.json()).catch(() => null)
+           ]).then(([valData1, valData2]) => {
+             let vals = valData1?.result?.validators || [];
+             if (valData2?.result?.validators) {
+                 vals = vals.concat(valData2.result.validators);
+             }
+             if (vals.length > 0) {
+                 setValidators(prev => prev.length === 0 ? vals.map((v: any) => ({
+                     address: v.address.toUpperCase(),
+                     votingPower: Number(v.voting_power),
+                     prevote: false,
+                     precommit: false,
+                 })) : prev);
+             }
+           });
+        }
+        
+        if (forceLive) {
+          setSearchInput("");
+          setTimeout(() => router.replace("/consensus"), 100);
+        }
       }
-      setPrevConsensus({
-        chain_id: consensusData.result.round_state.chain_id || chainId,
-        time: consensusData.result.round_state.start_time || null,
-      });
-      setPrevHeight(displayHeight);
-    } catch {
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || "Failed to fetch consensus data.");
+      if (heightParam) {
+        setSearchInput("");
+        setTimeout(() => router.replace("/consensus"), 100);
+      }
       setConsensus(null);
       setChainId(null);
       setProposer(null);
@@ -327,7 +375,7 @@ function ConsensusStatePage() {
       fetchData();
       return;
     }
-    timerRef.current = setTimeout(() => setTimer((t) => t - 1), 5000);
+    timerRef.current = setTimeout(() => setTimer((t) => t - 1), 1000);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
@@ -340,6 +388,8 @@ function ConsensusStatePage() {
   }
 
   const totalVotingPower = validators.reduce((sum, v) => sum + Number(v.votingPower), 0);
+  const votedCount = validators.filter(v => v.prevote).length;
+  
   let cumulative = 0;
 
   const [sortConfig, setSortConfig] = useState<{ key: "votingPower" | "address"; direction: "asc" | "desc" }>(
@@ -414,11 +464,7 @@ function ConsensusStatePage() {
     setDumpError(null);
 
     try {
-      const activeHeight = heightParam || null;
-      const url = activeHeight
-        ? `${RPC_URL}/dump_consensus_state?height=${activeHeight}`
-        : `${RPC_URL}/dump_consensus_state`;
-      const res = await fetch(url);
+      const res = await fetch(`${RPC_URL}/dump_consensus_state`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setDumpConsensus(data);
@@ -427,38 +473,46 @@ function ConsensusStatePage() {
     } finally {
       dumpLoadingRef.current = false;
     }
-  }, [heightParam]);
-
+  }, []);
 
   useEffect(() => {
     if (heightParam) return;
     if (paused) return;
     fetchDumpConsensus();
-  }, [height, paused, fetchDumpConsensus, heightParam]);
+  }, [event?.step, paused, fetchDumpConsensus, heightParam]);
 
 
   const cards: { label: string; value: string | number; accent: AccentColor }[] = [
-    { label: "Latest Height", value: height.toLocaleString() ?? "—", accent: "blue" },
-    { label: "Voting Round", value: round ?? "—", accent: "green" },
-    { label: "Pre‑votes", value: `${prevotes ?? "—"}%`, accent: "yellow" },
-    { label: "Pre‑commits", value: `${precommits ?? "—"}%`, accent: "purple" },
+    { label: heightParam ? "Target Height" : "Latest Height", value: height || "—", accent: "blue" },
+    ...(heightParam ? [
+      { label: "Latest Height", value: eventRaw?.height || "Loading...", accent: "blue" as AccentColor }
+    ] : []),
+    { label: heightParam ? "Round" : "Voting Round", value: round ?? "—", accent: "green" },
+    ...(heightParam ? [
+      { label: "Votes", value: `${votedCount} / ${validators.length}`, accent: "yellow" as AccentColor }
+    ] : [
+      { label: "Pre‑votes", value: `${prevotes ?? "—"}%`, accent: "yellow" as AccentColor },
+      { label: "Pre‑commits", value: `${precommits ?? "—"}%`, accent: "purple" as AccentColor }
+    ]),
     {
       label: "Chain ID",
       value: `${chainId ?? "—"}`,
       accent: "blue",
     },
     {
-      label: "Last Block",
+      label: heightParam ? "Block Time" : "Last Block",
       value: lastBlockTime ? timeAgo(lastBlockTime) : "—",
       accent: "green",
     },
-    {
-      label: "Peers",
-      value: Array.isArray(dumpConsensus?.result?.peers)
-        ? dumpConsensus.result.peers.length
-        : "—",
-      accent: "yellow",
-    }
+    ...(heightParam ? [] : [
+      {
+        label: "Peers",
+        value: Array.isArray(dumpConsensus?.result?.peers)
+          ? dumpConsensus.result.peers.length
+          : "—",
+        accent: "yellow" as AccentColor,
+      }
+    ])
   ];
 
   return (
@@ -474,9 +528,12 @@ function ConsensusStatePage() {
             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
               {heightParam && (
                 <button
-                  onClick={() => router.push("/consensus")}
+                  onClick={() => {
+                    setSearchInput("");
+                    window.location.href = "/consensus";
+                  }}
                   className="mr-2 p-2 text-gray-400 hover:text-white transition-colors"
-                  title="Back to live consensus"
+                  title="Go to live consensus page"
                 >
                   <FontAwesomeIcon icon={faArrowLeft} size="lg" />
                 </button>
@@ -498,9 +555,7 @@ function ConsensusStatePage() {
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && searchInput) {
-                      router.push(`/consensus?height=${searchInput}`);
-                    }
+                    if (e.key === "Enter") handleSearch();
                   }}
                   className="bg-[#0f1115] border border-gray-700 rounded-lg px-4 py-1.5 pl-10 text-sm focus:outline-none focus:border-blue-500 transition-all w-48 sm:w-64"
                 />
@@ -509,7 +564,7 @@ function ConsensusStatePage() {
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors pointer-events-none"
                 />
                 <button
-                  onClick={() => searchInput && router.push(`/consensus?height=${searchInput}`)}
+                  onClick={handleSearch}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-xs bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded transition-colors"
                 >
                   Search
@@ -757,8 +812,8 @@ function ConsensusStatePage() {
                     </th>
                     <th className="px-4 py-2 text-left">Cumulative Voting Power</th>
                     <th className="px-4 py-2 text-left">Voted</th>
-                    <th className="px-4 py-2 text-left">Precommit</th>
-                    <th className="px-4 py-2 text-left">Latest Round</th>
+                    {!heightParam && <th className="px-4 py-2 text-left">Precommit</th>}
+                    {!heightParam && <th className="px-4 py-2 text-left">Latest Round</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -768,12 +823,16 @@ function ConsensusStatePage() {
                     cumulative += votingPower;
                     const cumulativePercent = totalVotingPower ? ((cumulative / totalVotingPower) * 100).toFixed(2) : "0.00";
 
-                    let voted = false;
-                    let precommitted = false;
-                    const latestVoteSet = consensus?.height_vote_set?.[0];
-                    if (latestVoteSet) {
-                      voted = typeof latestVoteSet.prevotes?.[idx] === 'string' && !latestVoteSet.prevotes[idx].startsWith('nil');
-                      precommitted = typeof latestVoteSet.precommits?.[idx] === 'string' && !latestVoteSet.precommits[idx].startsWith('nil');
+                    const originalIdx = validators.findIndex(val => val.address === v.address);
+                    let voted = v.prevote || false;
+                    let precommitted = v.precommit || false;
+                    
+                    const latestVoteSet = consensus?.height_vote_set?.find((vs: any) => Number(vs.round) === round) 
+                                       || consensus?.height_vote_set?.[0];
+
+                    if (latestVoteSet && !heightParam && originalIdx !== -1) {
+                      voted = voted || (typeof latestVoteSet.prevotes?.[originalIdx] === 'string' && !latestVoteSet.prevotes[originalIdx].startsWith('nil'));
+                      precommitted = precommitted || (typeof latestVoteSet.precommits?.[originalIdx] === 'string' && !latestVoteSet.precommits[originalIdx].startsWith('nil'));
                     }
 
                     const rowColor = heightParam
@@ -803,8 +862,8 @@ function ConsensusStatePage() {
                         <td className="px-4 py-2">{votingPowerPercent}%</td>
                         <td className="px-4 py-2">{cumulativePercent}%</td>
                         <td className="px-4 py-2 text-center">{voted ? "✅" : "❌"}</td>
-                        <td className="px-4 py-2 text-center">{precommitted ? "✅" : "❌"}</td>
-                        <td className="px-4 py-2 text-center">{round}</td>
+                        {!heightParam && <td className="px-4 py-2 text-center">{precommitted ? "✅" : "❌"}</td>}
+                        {!heightParam && <td className="px-4 py-2 text-center">{round}</td>}
                       </tr>
                     );
                   })}
@@ -850,6 +909,15 @@ function ConsensusStatePage() {
       </main>
 
       <Footer />
+
+      {errorMsg && (
+        <div className="fixed bottom-4 right-4 bg-red-600/90 text-white px-6 py-3 rounded shadow-lg z-50 flex items-center gap-3">
+          <span>{errorMsg}</span>
+          <button onClick={() => setErrorMsg(null)} className="text-white hover:text-gray-200 text-xl leading-none">
+            &times;
+          </button>
+        </div>
+      )}
     </div >
 
   );
