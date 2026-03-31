@@ -106,6 +106,9 @@ export class Database {
             username: username,
             password: password,
             database: database,
+            compression: {
+                response: true,
+            }
         });
         this.nodes = [];
 
@@ -229,7 +232,7 @@ export class Database {
       WHERE address = {address:String}
     `;
 
-        await this.client.query({
+        await this.client.command({
             query,
             query_params: {
                 id: node.id,
@@ -391,7 +394,7 @@ ORDER BY blockTime DESC;
       WHERE height = {height:UInt64}
     `;
 
-            await this.client.query({
+            await this.client.command({
                 query,
                 query_params: {
                     height,
