@@ -50,7 +50,7 @@ export default function TransactionsPage() {
 
     let interval: any;
     if (autoRefresh && page === 1) {
-      interval = setInterval(() => fetchTxs(1), 5000);
+      interval = setInterval(() => fetchTxs(1), 1000);
     }
     return () => clearInterval(interval);
   }, [page, autoRefresh]);

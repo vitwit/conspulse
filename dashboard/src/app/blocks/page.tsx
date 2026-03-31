@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight, RefreshCw, AlertCircle } from "lucide-react"
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
 const LIMIT = 25;
-const REFRESH_INTERVAL = 10_000;
+const REFRESH_INTERVAL = 1_000;
 
 export default function BlocksPage() {
   const [blocks, setBlocks] = useState<any[]>([]);
