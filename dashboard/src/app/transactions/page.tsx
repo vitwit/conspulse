@@ -24,8 +24,8 @@ export default function TransactionsPage() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const router = useRouter();
 
-  const fetchTxs = async (p: number) => {
-    setLoading(true);
+  const fetchTxs = async (p: number, isAuto = false) => {
+    if (!isAuto) setLoading(true);
     try {
       const res = await fetch(`${API_URL}/txs?page=${p}&limit=25`);
       if (res.ok) {
@@ -36,12 +36,15 @@ export default function TransactionsPage() {
           hash: tx.txhash || tx.hash,
           success: tx.success !== undefined ? tx.success : !tx.raw_log?.toLowerCase().includes('error'),
         }));
-        setTxs(mapped);
+        // Only update if we got data, to prevent flashing "No transactions"
+        if (mapped.length > 0 || !isAuto) {
+          setTxs(mapped);
+        }
       }
     } catch (err) {
       console.error("Failed to fetch transactions", err);
     } finally {
-      setLoading(false);
+      if (!isAuto) setLoading(false);
     }
   };
 
@@ -50,7 +53,7 @@ export default function TransactionsPage() {
 
     let interval: any;
     if (autoRefresh && page === 1) {
-      interval = setInterval(() => fetchTxs(1), 1000);
+      interval = setInterval(() => fetchTxs(1, true), 1000);
     }
     return () => clearInterval(interval);
   }, [page, autoRefresh]);
@@ -105,8 +108,8 @@ export default function TransactionsPage() {
           </div>
         </div>
 
-        <div className="bg-[#1a1e24] rounded-xl border border-[#2a2f3a] overflow-hidden shadow-2xl">
-          <div className="overflow-x-auto">
+        <div className="bg-[#1a1e24] rounded-xl border border-[#2a2f3a] overflow-hidden shadow-2xl flex flex-col">
+          <div className="overflow-x-auto flex-1">
             <table className="min-w-full text-sm text-left">
               <thead>
                 <tr className="bg-[#21262d] text-gray-400 font-semibold uppercase tracking-wider text-[10px]">
@@ -126,7 +129,7 @@ export default function TransactionsPage() {
                   ))
                 ) : txs.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-20 text-center text-gray-500 italic">
+                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500 italic">
                       No transactions found.
                     </td>
                   </tr>
@@ -188,7 +191,7 @@ export default function TransactionsPage() {
           </div>
 
           {/* Pagination */}
-          <div className="bg-[#21262d] px-6 py-4 flex items-center justify-between border-t border-[#2a2f3a]">
+          <div className="bg-[#21262d] px-6 py-4 flex items-center justify-between border-t border-[#2a2f3a] mt-auto">
             <span className="text-xs text-gray-500 font-medium">
               Showing <span className="text-gray-300">{txs.length}</span> transactions
             </span>

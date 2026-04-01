@@ -36,3 +36,20 @@ export const getBlock = async (
         return res.status(500).json({ message: `Internal server error, ${err}` });
     }
 }
+
+export const getSideTx = async (
+    req: any,
+    res: any
+) => {
+    try {
+        const { height } = req.params;
+
+        const sideTx = await db.getSideTx(parseInt(height, 10));
+        return res.status(200).json({
+            sideTx
+        });
+    } catch (err) {
+        logger.error(`Internal server error ${err}`);
+        return res.status(500).json({ message: `Internal server error, ${err}` });
+    }
+}

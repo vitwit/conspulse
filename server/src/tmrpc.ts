@@ -254,6 +254,7 @@ export function connectWS(): void {
                     next_validators_hash: block.header['next_validators_hash'],
                     proposer_address: block.header['proposer_address'],
                     transactions: block.data.txs?.length || 0,
+                    txs_data: block.data.txs || [],
                     validators_hash: block.header['validators_hash'],
                     time: blockTime,
                     signatures: JSON.stringify(block.last_commit.signatures),
@@ -268,11 +269,16 @@ export function connectWS(): void {
                     const txBytes = Buffer.from(txBase64, "base64");
                     const events = response.result!.events || {};
 
+                    const height = Number(txResult.height)
+                    const blockInfo = blockCache.find(x => x.blockNumber == height);
+                    const blockTime = blockInfo ? dayjs(blockInfo.blockTime).utc().format('YYYY-MM-DD HH:mm:ss.SSSSSSSSS') :
+                        dayjs.utc().format('YYYY-MM-DD HH:mm:ss.SSSSSSSSS')
+
                     const txRaw = isRealCosmosTx(txBytes)
                     if (txRaw) {
-                        await handleRealTx(txResult, txRaw, events);
+                        await handleRealTx(txResult, txRaw, events, blockTime);
                     } else {
-                        await handleSideTx(txBytes, Number(txResult.height));
+                        await handleSideTx(txBytes, height, blockTime);
                     }
 
                 } catch (err) {
@@ -310,7 +316,8 @@ function isRealCosmosTx(txBytes: Uint8Array): DecodedTxRaw | null {
 async function handleRealTx(
     txResult: TxResult,
     txRaw: DecodedTxRaw,
-    events: Record<string, string[]>
+    events: Record<string, string[]>,
+    blockTime: string
 ) {
     try {
         const txhash = events["tx.hash"]?.[0];
@@ -328,10 +335,6 @@ async function handleRealTx(
         if (txRaw.authInfo?.fee?.amount?.length) {
             fee = txRaw.authInfo.fee.amount.map(a => a.amount + a.denom).join(',');
         }
-
-        const blockInfo = blockCache.find(x => x.blockNumber == height);
-        const blockTime = blockInfo ? dayjs(blockInfo.blockTime).utc().format('YYYY-MM-DD HH:mm:ss.SSSSSSSSS') :
-            dayjs.utc().format('YYYY-MM-DD HH:mm:ss.SSSSSSSSS')
 
         const txData = {
             txhash: (events["tx.hash"]?.[0] || '').toLowerCase(),
@@ -354,14 +357,21 @@ async function handleRealTx(
     }
 }
 
-async function handleSideTx(txBytes: Uint8Array, height: number) {
+async function handleSideTx(txBytes: Uint8Array, height: number, blockTime: string) {
     try {
         const ext = ExtendedCommitInfo.decode(txBytes);
 
         const commitJson = buildCommitJSON(height, ext);
         const summaryJson = buildSummaryJSON(ext);
 
-        await db.updateSideTxInfo(height, commitJson, summaryJson);
+        const sideTx = {
+            height,
+            time: blockTime,
+            sidetx_commits: commitJson,
+            sidetx_summary: summaryJson
+        }
+
+        await db.insertSideTx(sideTx);
     } catch (err) {
         logger.error(`[SideTx] Unknown tx format: ${err}`);
     }

@@ -4,6 +4,7 @@ import * as path from 'path';
 import logger from './../logger/logger';
 import { clients } from '../ws';
 import { WebSocket } from 'ws';
+import { randomUUID } from 'crypto';
 
 type NodeStatsMap = Map<string, NodeStats>;
 
@@ -66,15 +67,20 @@ type Block = {
     next_validators_hash: string;
 
     transactions: number;
+    txs_data: string[];
 
     evidence_hash: string;
 
     signatures: string;
     result_finalize_block: any;
-
-    sidetx_commits?: any;
-    sidetx_summary?: any;
 };
+
+type SideTx = {
+    height: number;
+    time: string;
+    sidetx_commits: any;
+    sidetx_summary: any;
+}
 
 type Transaction = {
     txhash: string;
@@ -108,6 +114,9 @@ export class Database {
             database: database,
             compression: {
                 response: true,
+            },
+            clickhouse_settings: {
+                async_insert: 0,
             }
         });
         this.nodes = [];
@@ -384,32 +393,6 @@ ORDER BY blockTime DESC;
         }
     }
 
-    async updateSideTxInfo(height: number, commits: any, summary: any): Promise<void> {
-        try {
-            const query = `
-      ALTER TABLE blocks
-      UPDATE 
-        sidetx_commits = {commits:String},
-        sidetx_summary = {summary:String}
-      WHERE height = {height:UInt64}
-    `;
-
-            await this.client.command({
-                query,
-                query_params: {
-                    height,
-                    commits: JSON.stringify(commits),
-                    summary: JSON.stringify(summary),
-                },
-            });
-
-            logger.debug(`Block updated with side txs info: ${height}`);
-        } catch (err) {
-            logger.error(`Failed updating side txs info in block ${height}: ${err}`);
-            throw err;
-        }
-    }
-
     async getBlocksPaginated(
         page: number = 1,
         limit: number = 25
@@ -459,6 +442,56 @@ ORDER BY blockTime DESC;
             return data[0] as Block;
         } catch (err) {
             logger.error(`Failed to fetch single block: ${err} `);
+            throw err;
+        }
+    }
+
+    async insertSideTx(sideTx: SideTx): Promise<void> {
+        try {
+            const row = {
+                insert_id: randomUUID(),  // unique per insert
+                height: sideTx.height,
+                time: sideTx.time,
+                sidetx_commits: JSON.stringify(sideTx.sidetx_commits),
+                sidetx_summary: JSON.stringify(sideTx.sidetx_summary),
+            };
+
+            await this.client.insert({
+                table: 'side_txs',
+                values: [row],
+                format: 'JSONEachRow',
+            });
+
+            logger.debug(`Side Tx info inserted: height=${sideTx.height}`);
+        } catch (err) {
+            logger.error(`Failed to insert sideTx info for block: ${sideTx.height}: ${err}`);
+            throw err;
+        }
+    }
+
+    async getSideTx(
+        height: number
+    ): Promise<SideTx> {
+        const query = `
+        SELECT *
+        FROM side_txs
+        WHERE height = ${height}
+        `;
+
+        try {
+            const result = await this.client.query({
+                query,
+                format: 'JSONEachRow',
+            });
+
+            const data = await result.json();
+            if (data.length === 0) {
+                throw new Error(`SideTx for height ${height} not found`);
+            }
+
+            return data[0] as SideTx;
+        } catch (err) {
+            logger.error(`Failed to fetch side Tx info for block ${height}: ${err} `);
             throw err;
         }
     }

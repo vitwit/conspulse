@@ -13,8 +13,6 @@ interface Block {
   proposer_address: string;
   data_hash: string;
   transactions: number;
-  sidetx_commits?: any;
-  sidetx_summary?: any;
 }
 
 interface BlocksTableProps {
@@ -37,14 +35,13 @@ const BlocksTable: React.FC<BlocksTableProps> = ({ blocks }) => {
             <th className="px-6 py-4 font-semibold">Block Hash</th>
             <th className="px-6 py-4 font-semibold">Proposer</th>
             <th className="px-6 py-4 font-semibold">TX Count</th>
-            <th className="px-6 py-4 font-semibold">Side TX</th>
             <th className="px-6 py-4 font-semibold text-right">Created At</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-[#2a2f3a]">
           {blocks.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-6 py-10 text-center text-gray-500">
+              <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
                 No blocks found
               </td>
             </tr>
@@ -75,15 +72,6 @@ const BlocksTable: React.FC<BlocksTableProps> = ({ blocks }) => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-gray-300 font-mono">
                   {block.transactions}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {block.sidetx_commits || block.sidetx_summary ? (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-500/20 text-blue-400 font-bold">
-                      YES
-                    </span>
-                  ) : (
-                    <span className="text-gray-600 text-[10px] font-bold">NO</span>
-                  )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
                   <div className="flex flex-col items-end">

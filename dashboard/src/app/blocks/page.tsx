@@ -4,7 +4,8 @@ import React, { useEffect, useState, useCallback } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import BlocksTable from "./BlocksTable";
-import { ChevronLeft, ChevronRight, RefreshCw, AlertCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, AlertCircle, Search } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
@@ -17,6 +18,16 @@ export default function BlocksPage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [searchHeight, setSearchHeight] = useState("");
+
+  const router = useRouter();
+
+  const handleSearch = () => {
+    const clean = searchHeight.replace(/,/g, "").trim();
+    if (!/^\d+$/.test(clean)) return;
+    const num = Number(clean);
+    if (num > 0) router.push(`/blocks/${num}`);
+  };
 
   const fetchBlocks = useCallback(async (pageNum: number, isAuto = false) => {
     isAuto ? setIsRefreshing(true) : setLoading(true);
@@ -59,7 +70,22 @@ export default function BlocksPage() {
             <p className="text-gray-400 text-sm mt-1">Real-time block production on the network</p>
           </div>
 
-          <div className="flex items-center gap-2 bg-[#1a1e24] p-1 rounded-lg border border-[#2a2f3a]">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center bg-[#1a1e24] border border-[#2a2f3a] rounded-lg px-3 py-2 focus-within:border-blue-500/50 transition-all">
+              <Search size={18} className="text-gray-500" />
+              <input 
+                type="text" 
+                placeholder="Search by Block Height..." 
+                value={searchHeight}
+                onChange={(e) => setSearchHeight(e.target.value)}
+                className="bg-transparent border-none outline-none text-white text-sm ml-2 w-48"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSearch();
+                }}
+              />
+            </div>
+
+            <div className="flex items-center gap-2 bg-[#1a1e24] p-1 rounded-lg border border-[#2a2f3a]">
             <button
               onClick={() => { if (page > 1 && !loading) setPage(p => p - 1); }}
               disabled={page === 1 || loading}
@@ -79,6 +105,7 @@ export default function BlocksPage() {
             </button>
           </div>
         </div>
+      </div>
 
         {error && (
           <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 mb-6 flex items-center justify-between gap-4">

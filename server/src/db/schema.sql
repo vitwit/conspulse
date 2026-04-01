@@ -57,20 +57,31 @@ CREATE TABLE IF NOT EXISTS blocks (
     next_validators_hash String,
 
     transactions UInt64,
-    
+    txs_data Array(String),
+
     evidence_hash String,
 
     signatures String,
     
-    result_finalize_block JSON,
-
-    sidetx_commits JSON,
-    sidetx_summary JSON
+    result_finalize_block JSON
 )
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(time)             
 ORDER BY (time, height)                 
 TTL time + INTERVAL 3 MONTH DELETE; 
+
+CREATE TABLE IF NOT EXISTS side_txs
+(
+    insert_id UUID,
+    height UInt64,
+    time DateTime64(9, 'UTC'),
+    sidetx_commits String,
+    sidetx_summary String
+)
+ENGINE = ReplacingMergeTree()
+PARTITION BY toYYYYMM(time)             
+ORDER BY (height, insert_id)   
+TTL time + INTERVAL 3 MONTH DELETE;
 
 CREATE TABLE IF NOT EXISTS transactions (
     txhash String,

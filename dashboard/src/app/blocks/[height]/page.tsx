@@ -14,17 +14,18 @@ import JsonViewer from "../../components/JsonViewer";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
-type Tab = "transactions" | "protocol" | "side_tx" | "events" | "json";
+type Tab =  "side_tx" | "transactions" | "events" | "json";
 
 export default function BlockDetailPage() {
   const { height } = useParams();
   const router = useRouter();
   const [block, setBlock] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [sideTx, setSideTx] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [txLoading, setTxLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>("transactions");
+  const [activeTab, setActiveTab] = useState<Tab>("side_tx");
 
   useEffect(() => {
     if (!height) return;
@@ -34,21 +35,24 @@ export default function BlockDetailPage() {
       setError(null);
 
       try {
-        // Fetch block and transactions in parallel
-        const [blockRes, txRes] = await Promise.all([
+        // Fetch block, transactions, and side tx in parallel
+        const [blockRes, txRes, sideTxRes] = await Promise.all([
           fetch(`${API_URL}/blocks/${height}`),
-          fetch(`${API_URL}/txs?height=${height}`), // ✅ uses height query param directly
+          fetch(`${API_URL}/txs?height=${height}`),
+          fetch(`${API_URL}/sideTx/${height}`),
         ]);
 
         if (!blockRes.ok) throw new Error(`HTTP ${blockRes.status}`);
 
-        const [blockData, txData] = await Promise.all([
+        const [blockData, txData, sideTxData] = await Promise.all([
           blockRes.json(),
           txRes.ok ? txRes.json() : Promise.resolve({ txs: [] }),
+          sideTxRes.ok ? sideTxRes.json() : Promise.resolve(null),
         ]);
 
         setBlock(blockData.block);
         setTransactions(txData.txs || []);
+        setSideTx(sideTxData);
       } catch (err: any) {
         setError(err.message || "Unknown error");
       } finally {
@@ -184,9 +188,9 @@ export default function BlockDetailPage() {
 
         {/* Tabs */}
         <div className="border-b border-[#2a2f3a] flex gap-6">
-          <TabItem label="Transactions" count={transactions.length} active={activeTab === "transactions"} onClick={() => setActiveTab("transactions")} />
-          <TabItem label="Protocol" count={(blockData.consensus_param_updates ? 1 : 0) + (blockData.validator_updates?.length || 0)} active={activeTab === "protocol"} onClick={() => setActiveTab("protocol")} />
           <TabItem label="Side Txs" active={activeTab === "side_tx"} onClick={() => setActiveTab("side_tx")} />
+          <TabItem label="Other Transactions" count={transactions.length} active={activeTab === "transactions"} onClick={() => setActiveTab("transactions")} />
+          {/* <TabItem label="Protocol" count={(blockData.consensus_param_updates ? 1 : 0) + (blockData.validator_updates?.length || 0)} active={activeTab === "protocol"} onClick={() => setActiveTab("protocol")} /> */}
           <TabItem label="Block Events" active={activeTab === "events"} onClick={() => setActiveTab("events")} />
           <TabItem label="Raw JSON" active={activeTab === "json"} onClick={() => setActiveTab("json")} />
         </div>
@@ -258,7 +262,7 @@ export default function BlockDetailPage() {
           )}
 
           {/* Protocol */}
-          {activeTab === "protocol" && (
+          {/* {activeTab === "protocol" && (
             <div className="space-y-6">
               <div className="bg-[#1a1e24] rounded-lg border border-[#2a2f3a] overflow-hidden">
                 <div className="bg-[#21262d] px-6 py-4 border-b border-[#2a2f3a]">
@@ -312,25 +316,11 @@ export default function BlockDetailPage() {
                 </div>
               </div>
             </div>
-          )}
+          )} */}
 
           {/* Side Txs */}
           {activeTab === "side_tx" && (
             <div className="space-y-6">
-              <div className="bg-[#1a1e24] rounded-lg border border-[#2a2f3a] overflow-hidden">
-                <div className="bg-[#21262d] px-6 py-4 border-b border-[#2a2f3a]">
-                  <h3 className="text-xs font-bold text-blue-400 uppercase tracking-widest flex items-center gap-2">
-                    <CheckCircle2 size={14} /> Side Tx Commits
-                  </h3>
-                </div>
-                <div className="p-6">
-                  {blockData.sidetx_commits
-                    ? <JsonViewer data={blockData.sidetx_commits} initialExpanded={true} />
-                    : <p className="text-gray-600 italic text-sm">No side tx commits at this height.</p>
-                  }
-                </div>
-              </div>
-
               <div className="bg-[#1a1e24] rounded-lg border border-[#2a2f3a] overflow-hidden">
                 <div className="bg-[#21262d] px-6 py-4 border-b border-[#2a2f3a]">
                   <h3 className="text-xs font-bold text-purple-400 uppercase tracking-widest flex items-center gap-2">
@@ -338,9 +328,23 @@ export default function BlockDetailPage() {
                   </h3>
                 </div>
                 <div className="p-6">
-                  {blockData.sidetx_summary
-                    ? <JsonViewer data={blockData.sidetx_summary} initialExpanded={true} />
+                  {sideTx?.sidetx_summary
+                    ? <JsonViewer data={sideTx.sidetx_summary} />
                     : <p className="text-gray-600 italic text-sm">No side tx summary at this height.</p>
+                  }
+                </div>
+              </div>
+
+              <div className="bg-[#1a1e24] rounded-lg border border-[#2a2f3a] overflow-hidden">
+                <div className="bg-[#21262d] px-6 py-4 border-b border-[#2a2f3a]">
+                  <h3 className="text-xs font-bold text-blue-400 uppercase tracking-widest flex items-center gap-2">
+                    <CheckCircle2 size={14} /> Side Tx Commits
+                  </h3>
+                </div>
+                <div className="p-6">
+                  {sideTx?.sidetx_commits
+                    ? <JsonViewer data={sideTx.sidetx_commits} />
+                    : <p className="text-gray-600 italic text-sm">No side tx commits at this height.</p>
                   }
                 </div>
               </div>
@@ -350,14 +354,14 @@ export default function BlockDetailPage() {
           {/* Events */}
           {activeTab === "events" && (
             <div className="bg-[#1a1e24] rounded-lg border border-[#2a2f3a] p-6 overflow-x-auto">
-              <JsonViewer data={blockData.result_finalize_block} initialExpanded={false} />
+              <JsonViewer data={blockData.result_finalize_block} />
             </div>
           )}
 
           {/* Raw JSON */}
           {activeTab === "json" && (
             <div className="bg-[#1a1e24] rounded-lg border border-[#2a2f3a] p-6 overflow-x-auto">
-              <JsonViewer data={blockData} initialExpanded={false} />
+              <JsonViewer data={blockData} />
             </div>
           )}
         </div>

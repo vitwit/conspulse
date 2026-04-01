@@ -7,10 +7,10 @@ import Link from "next/link";
 
 const NAV_ITEMS = [
   { label: "Heartbeat", key: "heartbeat", href: "/" },
+  { label: "Consensus", key: "consensus", href: "/consensus" },
   { label: "Blocks", key: "blocks", href: "/blocks" },
   { label: "Transactions", key: "transactions", href: "/transactions" },
-  { label: "Consensus", key: "consensus", href: "/consensus" },
-  { label: "Debug Consensus", key: "debug-consensus", href: "/debug-consensus" },
+  // { label: "Debug Consensus", key: "debug-consensus", href: "/debug-consensus" },
 ];
 
 export default function Navbar(props: { shrink: boolean }) {
