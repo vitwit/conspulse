@@ -11,7 +11,9 @@ import { blockCache } from './controllers/cache';
 import { averageBlockTime, blockTimeBuckets, connectWS } from './tmrpc';
 import { createServer } from 'http';
 import { setupWebSocket } from './ws';
-
+import { Registry, decodeTxRaw } from "@cosmjs/proto-signing";
+import { VoteExtension } from './proto/heimdallv2/sidetxs/vote_ext';
+import { MsgCheckpoint, MsgCpAck } from './proto/heimdallv2/checkpoint/tx';
 
 connectWS();
 
@@ -27,6 +29,13 @@ export const server = createServer(app);
     try {
         await db.initialize();
         await db.initializeSchema("./src/db/schema.sql");
+
+        const registry = new Registry();
+
+        // Register your VoteExtension type
+        registry.register("/heimdallv2.sidetxs.VoteExtension", VoteExtension);
+        registry.register("/heimdallv2.checkpoint.MsgCheckpoint", MsgCheckpoint);
+        registry.register("/heimdallv2.checkpoint.MsgCpAck", MsgCpAck);
 
         app.use('/api', router);
 

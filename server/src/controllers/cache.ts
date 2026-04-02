@@ -2,6 +2,7 @@ type BlockInfo = {
     blockNumber: number;
     blockTime: number;
     txnCount: number;
+    time: number;
 };
 
 export const blockCache: BlockInfo[] = [];
@@ -19,7 +20,7 @@ export function cacheBlock(blockNumber: number, currentTime: number, txnCount: n
         timeSinceLastBlock = currentTime - lastBlockTime;
     }
 
-    blockCache.push({ blockNumber, blockTime: timeSinceLastBlock, txnCount });
+    blockCache.push({ blockNumber, blockTime: timeSinceLastBlock, txnCount, time: currentTime });
 
     lastBlockTime = currentTime;
 

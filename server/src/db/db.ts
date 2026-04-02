@@ -4,6 +4,7 @@ import * as path from 'path';
 import logger from './../logger/logger';
 import { clients } from '../ws';
 import { WebSocket } from 'ws';
+import { randomUUID } from 'crypto';
 
 type NodeStatsMap = Map<string, NodeStats>;
 
@@ -66,11 +67,35 @@ type Block = {
     next_validators_hash: string;
 
     transactions: number;
+    txs_data: string[];
 
     evidence_hash: string;
+
+    signatures: string;
+    result_finalize_block: any;
 };
 
+type SideTx = {
+    height: number;
+    time: string;
+    sidetx_commits: any;
+    sidetx_summary: any;
+}
 
+type Transaction = {
+    txhash: string;
+    height: number;
+    time: string; // ISO
+    sender: string;
+    data: string;
+    raw_log: string;
+    raw_tx: string;
+    messages: any[];
+    events: any[];
+    gas_wanted: number;
+    gas_used: number;
+    fee: string;
+}
 
 export class Database {
     private client: ReturnType<typeof createClient>;
@@ -87,6 +112,9 @@ export class Database {
             username: username,
             password: password,
             database: database,
+            compression: {
+                response: true,
+            },
         });
         this.nodes = [];
 
@@ -210,7 +238,7 @@ export class Database {
       WHERE address = {address:String}
     `;
 
-        await this.client.query({
+        await this.client.command({
             query,
             query_params: {
                 id: node.id,
@@ -347,7 +375,6 @@ ORDER BY blockTime DESC;
         }
     }
 
-
     async insertBlock(block: Block): Promise<void> {
         try {
             await this.client.insert({
@@ -365,7 +392,7 @@ ORDER BY blockTime DESC;
 
     async getBlocksPaginated(
         page: number = 1,
-        limit: number = 500
+        limit: number = 25
     ): Promise<Block[]> {
         const offset = (page - 1) * limit;
         const query = `
@@ -385,6 +412,167 @@ ORDER BY blockTime DESC;
             return data as Block[];
         } catch (err) {
             logger.error(`Failed to fetch paginated blocks: ${err}`);
+            throw err;
+        }
+    }
+
+    async getBlock(
+        height: number
+    ): Promise<Block> {
+        const query = `
+        SELECT *
+        FROM blocks
+        WHERE height = ${height}
+        `;
+
+        try {
+            const result = await this.client.query({
+                query,
+                format: 'JSONEachRow',
+            });
+
+            const data = await result.json();
+            if (data.length === 0) {
+                throw new Error(`Block with height ${height} not found`);
+            }
+
+            return data[0] as Block;
+        } catch (err) {
+            logger.error(`Failed to fetch single block: ${err} `);
+            throw err;
+        }
+    }
+
+    async insertSideTx(sideTx: SideTx): Promise<void> {
+        try {
+
+            await this.client.insert({
+                table: 'side_txs',
+                values: [sideTx],
+                format: 'JSONEachRow',
+            });
+
+            logger.debug(`Side Tx info inserted: height=${sideTx.height}`);
+        } catch (err) {
+            logger.error(`Failed to insert sideTx info for block: ${sideTx.height}: ${err}`);
+            throw err;
+        }
+    }
+
+    async getSideTx(
+        height: number
+    ): Promise<SideTx> {
+        const query = `
+        SELECT *
+        FROM side_txs
+        WHERE height = ${height}
+        `;
+
+        try {
+            const result = await this.client.query({
+                query,
+                format: 'JSONEachRow',
+            });
+
+            const data = await result.json();
+            if (data.length === 0) {
+                throw new Error(`SideTx for height ${height} not found`);
+            }
+
+            return data[0] as SideTx;
+        } catch (err) {
+            logger.error(`Failed to fetch side Tx info for block ${height}: ${err} `);
+            throw err;
+        }
+    }
+
+    async insertTransaction(tx: Transaction): Promise<void> {
+        try {
+            await this.client.insert({
+                table: 'transactions',
+                values: [tx],
+                format: 'JSONEachRow',
+            });
+
+            logger.debug(`Transaction inserted: tx=${tx.txhash}, height=${tx.height}`);
+        } catch (err) {
+            logger.error(`Failed to insert transaction: ${err}`);
+            throw err;
+        }
+    }
+
+    async getTxsPaginated(
+        page: number = 1,
+        limit: number = 10
+    ): Promise<Transaction[]> {
+        const offset = (page - 1) * limit;
+        const query = `
+        SELECT *
+        FROM transactions
+        ORDER BY height DESC, time DESC
+        LIMIT ${limit} OFFSET ${offset}
+    `;
+
+        try {
+            const result = await this.client.query({
+                query,
+                format: 'JSONEachRow',
+            });
+
+            const data = await result.json();
+            return data as Transaction[];
+        } catch (err) {
+            logger.error(`Failed to fetch paginated transactions: ${err}`);
+            throw err;
+        }
+    }
+
+    async getTransaction(
+        txhash: string
+    ): Promise<Transaction> {
+        const query = `
+        SELECT *
+        FROM transactions
+        WHERE txhash = '${txhash}'
+        `;
+
+        try {
+            const result = await this.client.query({
+                query,
+                format: 'JSONEachRow',
+            });
+
+            const data = await result.json();
+            if (data.length === 0) {
+                throw new Error(`Transaction with txhash ${txhash} not found`);
+            }
+
+            return data[0] as Transaction;
+        } catch (err) {
+            logger.error(`Failed to fetch transaction: ${err} `);
+            throw err;
+        }
+    }
+
+    async getTxsByHeight(
+        height: number
+    ): Promise<Transaction[]> {
+        const query = `
+        SELECT *
+        FROM transactions
+        WHERE height = '${height}'
+        `;
+
+        try {
+            const result = await this.client.query({
+                query,
+                format: 'JSONEachRow',
+            });
+
+            const data = await result.json();
+            return data as Transaction[];
+        } catch (err) {
+            logger.error(`Failed to fetch transactions for block ${height}: ${err} `);
             throw err;
         }
     }

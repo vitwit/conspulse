@@ -1,16 +1,17 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback, Suspense } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { useTendermint } from "../context/TendermintListener";
 import { useTendermintHistory, ValidatorInfo } from "../context/TendermintHistoryListener";
+import { useSearchParams, useRouter } from "next/navigation";
 import { SupportUS } from "../components/SupportUs";
 import { useWebSocket } from "../context/WebsocketContext";
 import { Stats } from "../types/ws";
 import CopyButton from "../components/CopyButton";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faClipboard, faCheck } from '@fortawesome/free-solid-svg-icons';
+import { faClipboard, faCheck, faSearch, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
 const NETWORK_NAME = process.env.NEXT_PUBLIC_NETWORK_NAME || "";
@@ -43,6 +44,14 @@ function timeAgo(date: Date | null) {
 type AccentColor = "blue" | "green" | "yellow" | "purple";
 
 export default function Home() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0f1115] text-white flex items-center justify-center">Loading...</div>}>
+      <ConsensusStatePage />
+    </Suspense>
+  );
+}
+
+function ConsensusStatePage() {
   const [consensus, setConsensus] = useState<any>(null);
   const [validators, setValidators] = useState<ValidatorInfo[]>([]);
   const [timer, setTimer] = useState(1);
@@ -58,12 +67,46 @@ export default function Home() {
   const [dumpLoading, setDumpLoading] = useState(false);
   const [dumpError, setDumpError] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const heightParam = searchParams.get("height");
+
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (errorMsg) {
+      const t = setTimeout(() => setErrorMsg(null), 5000);
+      return () => clearTimeout(t);
+    }
+  }, [errorMsg]);
+
+  const parseHeight = (val: string | null) => {
+    if (!val) return null;
+    const clean = val.replace(/,/g, "").trim();
+    if (!/^\d+$/.test(clean)) return NaN;
+    const num = Number(clean);
+    if (num <= 0) return NaN;
+    return num;
+  };
+
+  const handleSearch = useCallback(() => {
+    const numHeight = parseHeight(searchInput);
+    if (!numHeight || isNaN(numHeight)) {
+      setErrorMsg("Invalid height. Please enter numbers only.");
+      return;
+    }
+    router.push(`/consensus?height=${numHeight}`);
+  }, [searchInput, router]);
+
+  const [historicalEvent, setHistoricalEvent] = useState<any>(null);
+  const [historicalHistory, setHistoricalHistory] = useState<any>(null);
 
   const eventRaw = useTendermint();
   const historyRaw = useTendermintHistory();
 
-  const event = paused ? null : eventRaw;
-  const history = paused ? null : historyRaw;
+  const event = heightParam ? historicalEvent : (paused ? null : eventRaw);
+  const history = heightParam ? historicalHistory : (paused ? null : historyRaw);
 
   const [currentStep, setCurrentStep] = useState<string>("");
   const [height, setHeight] = useState<number>(0);
@@ -88,9 +131,32 @@ export default function Home() {
     }
   }, [history?.validators]);
 
+  useEffect(() => {
+    if (!heightParam) {
+      setSearchInput("");
+      setHistoricalEvent(null);
+      setHistoricalHistory(null);
+      setValidators(historyRaw?.validators || []);
+      setPaused(false);
+    } else {
+      setHeight(Number(heightParam));
+      setSearchInput(heightParam);
+      // Clear old historical data to force a fresh fetch state
+      setHistoricalEvent(null);
+      setHistoricalHistory(null);
+      setValidators([]);
+      setCurrentStep("Loading...");
+      setProgressFill(0);
+    }
+  }, [heightParam]);
+
   const [lastBlockTime, setLastBlockTime] = useState(new Date());
   useEffect(() => {
     if (!event) return;
+    if (event.step) {
+        if (event.step === "Commit") setCurrentStep("Finalized");
+        else setCurrentStep(event.step);
+    }
     switch (event.step) {
       case "NewHeight":
         setProgressFill(25);
@@ -132,38 +198,168 @@ export default function Home() {
 
   const fetchData = async () => {
     try {
-      const consensusRes = await fetch(`${RPC_URL}/consensus_state`);
-      const consensusData = await consensusRes.json();
-      setConsensus(consensusData.result.round_state);
-      setProposer(consensusData.result.round_state.proposer?.address || null);
-      const { height } = parseHeightRoundStep(consensusData.result.round_state["height/round/step"] || "");
-      if (prevConsensus && prevHeight && height === prevHeight + 1) {
-      } else if (height > 1) {
+      let targetHeight = parseHeight(heightParam);
+      let forceLive = false;
+
+      if (heightParam && (targetHeight === null || isNaN(targetHeight))) {
+        setErrorMsg("Invalid height value provided in URL.");
+        forceLive = true;
+        targetHeight = null;
+      }
+
+      if (targetHeight) {
+        setConsensus(null);
+        setDumpConsensus(null);
+
+        let currentRound = 0;
+        let votedAddresses: string[] = [];
+
         try {
-          const blockRes = await fetch(`${RPC_URL}/block?height=${height - 1}`);
-          const blockData = await blockRes.json();
-          const header = blockData.result.block.header;
-          setChainId(header.chain_id);
-          setLastBlockTime(new Date(header.time));
-        } catch {
+          const commitRes = await fetch(`${RPC_URL}/commit?height=${targetHeight}`);
+          if (commitRes.ok) {
+            const commitData = await commitRes.json();
+            if (commitData.error) {
+              throw new Error(commitData.error.data || commitData.error.message || "API Error");
+            }
+            const header = commitData?.result?.signed_header?.header;
+            const commit = commitData?.result?.signed_header?.commit;
+
+            setChainId(header?.chain_id || null);
+            setLastBlockTime(header?.time ? new Date(header.time) : new Date());
+            setProposer(header?.proposer_address || null);
+
+            currentRound = Number(commit?.round || 0);
+            const signatures = commit?.signatures || [];
+            votedAddresses = signatures
+              .map((s: any) => (s.validator_address || s.address)?.toUpperCase())
+              .filter(Boolean);
+
+            setHeight(targetHeight);
+            setRound(currentRound);
+
+            setHistoricalEvent({
+              type: "Step",
+              step: "Commit",
+              height: targetHeight,
+              round: currentRound,
+              stepValue: 7
+            });
+
+            setCurrentStep("Finalized");
+            setProgressFill(100);
+
+            const perPage = 100;
+            let page = 1;
+            let allValidators: ValidatorInfo[] = [];
+            for (;;) {
+              const valUrl = `${RPC_URL}/validators?height=${targetHeight}&per_page=${perPage}&page=${page}`;
+              const valRes = await fetch(valUrl);
+              const valData = await valRes.json();
+              const vals = valData?.result?.validators ?? [];
+              const mapped: ValidatorInfo[] = vals.map((v: any) => {
+                const addr = v.address.toUpperCase();
+                const voted = votedAddresses.includes(addr);
+                return {
+                  address: addr,
+                  votingPower: Number(v.voting_power),
+                  prevote: voted, 
+                  precommit: voted,
+                };
+              });
+              allValidators = allValidators.concat(mapped);
+              if (vals.length < perPage) break;
+              page += 1;
+            }
+            setValidators(allValidators);
+          } else {
+            throw new Error(`Height ${targetHeight} might be in the future or not available.`);
+          }
+        } catch (err: any) {
+          console.error("Historical error:", err);
+          setErrorMsg(err.message || "Failed to fetch historical data.");
+          forceLive = true;
+          targetHeight = null;
+        }
+      }
+
+      if (!targetHeight || forceLive) {
+        const consensusRes = await fetch(`${RPC_URL}/consensus_state`);
+        const consensusData = await consensusRes.json();
+        
+        if (consensusData.error) throw new Error(consensusData.error.message);
+
+        setConsensus(consensusData.result.round_state);
+        setProposer(consensusData.result.round_state.proposer?.address || null);
+
+        const stateStr = consensusData.result.round_state["height/round/step"] || "";
+        const [h, r, s] = stateStr.split("/");
+        const rpcHeight = Number(h);
+        const currentRound = Number(r);
+        const currentStepNum = Number(s);
+
+        const displayHeight = rpcHeight;
+        setHeight(displayHeight);
+        setRound(currentRound);
+
+        if (prevConsensus && prevHeight && displayHeight === prevHeight + 1) {
+        } else if (displayHeight > 1) {
+          try {
+            const blockRes = await fetch(`${RPC_URL}/block?height=${displayHeight - 1}`);
+            const blockData = await blockRes.json();
+            const header = blockData.result.block.header;
+            setChainId(header.chain_id);
+            setLastBlockTime(new Date(header.time));
+          } catch {
+            setChainId(null);
+          }
+        } else {
           setChainId(null);
         }
-      } else {
-        setChainId(null);
+        setPrevConsensus({
+          chain_id: consensusData.result.round_state.chain_id || chainId,
+          time: consensusData.result.round_state.start_time || null,
+        });
+        setPrevHeight(displayHeight);
+
+        if (validators.length === 0) {
+           Promise.all([
+             fetch(`${RPC_URL}/validators?per_page=100&page=1`).then(r => r.json()).catch(() => null),
+             fetch(`${RPC_URL}/validators?per_page=100&page=2`).then(r => r.json()).catch(() => null)
+           ]).then(([valData1, valData2]) => {
+             let vals = valData1?.result?.validators || [];
+             if (valData2?.result?.validators) {
+                 vals = vals.concat(valData2.result.validators);
+             }
+             if (vals.length > 0) {
+                 setValidators(prev => prev.length === 0 ? vals.map((v: any) => ({
+                     address: v.address.toUpperCase(),
+                     votingPower: Number(v.voting_power),
+                     prevote: false,
+                     precommit: false,
+                 })) : prev);
+             }
+           });
+        }
+        
+        if (forceLive) {
+          setSearchInput("");
+          setTimeout(() => router.replace("/consensus"), 100);
+        }
       }
-      setPrevConsensus({
-        chain_id: consensusData.result.round_state.chain_id || chainId,
-        time: consensusData.result.round_state.start_time || null,
-      });
-      setPrevHeight(height);
-    } catch {
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || "Failed to fetch consensus data.");
+      if (heightParam) {
+        setSearchInput("");
+        setTimeout(() => router.replace("/consensus"), 100);
+      }
       setConsensus(null);
       setChainId(null);
       setProposer(null);
       setPrevConsensus(null);
       setPrevHeight(null);
     } finally {
-      setTimer(1);
+      if (!heightParam) setTimer(1);
     }
   };
 
@@ -172,14 +368,14 @@ export default function Home() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, []);
+  }, [heightParam]);
   useEffect(() => {
-    if (paused) return;
+    if (paused || heightParam) return;
     if (timer === 0) {
       fetchData();
       return;
     }
-    timerRef.current = setTimeout(() => setTimer((t) => t - 1), 5000);
+    timerRef.current = setTimeout(() => setTimer((t) => t - 1), 1000);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
@@ -192,6 +388,8 @@ export default function Home() {
   }
 
   const totalVotingPower = validators.reduce((sum, v) => sum + Number(v.votingPower), 0);
+  const votedCount = validators.filter(v => v.prevote).length;
+  
   let cumulative = 0;
 
   const [sortConfig, setSortConfig] = useState<{ key: "votingPower" | "address"; direction: "asc" | "desc" }>(
@@ -277,35 +475,44 @@ export default function Home() {
     }
   }, []);
 
-
   useEffect(() => {
+    if (heightParam) return;
     if (paused) return;
     fetchDumpConsensus();
-  }, [height, paused, fetchDumpConsensus]);
+  }, [event?.step, paused, fetchDumpConsensus, heightParam]);
 
 
   const cards: { label: string; value: string | number; accent: AccentColor }[] = [
-    { label: "Latest Height", value: height.toLocaleString() ?? "—", accent: "blue" },
-    { label: "Voting Round", value: round ?? "—", accent: "green" },
-    { label: "Pre‑votes", value: `${prevotes ?? "—"}%`, accent: "yellow" },
-    { label: "Pre‑commits", value: `${precommits ?? "—"}%`, accent: "purple" },
+    { label: heightParam ? "Target Height" : "Latest Height", value: height || "—", accent: "blue" },
+    ...(heightParam ? [
+      { label: "Latest Height", value: eventRaw?.height || "Loading...", accent: "blue" as AccentColor }
+    ] : []),
+    { label: heightParam ? "Round" : "Voting Round", value: round ?? "—", accent: "green" },
+    ...(heightParam ? [
+      { label: "Votes", value: `${votedCount} / ${validators.length}`, accent: "yellow" as AccentColor }
+    ] : [
+      { label: "Pre‑votes", value: `${prevotes ?? "—"}%`, accent: "yellow" as AccentColor },
+      { label: "Pre‑commits", value: `${precommits ?? "—"}%`, accent: "purple" as AccentColor }
+    ]),
     {
       label: "Chain ID",
       value: `${chainId ?? "—"}`,
       accent: "blue",
     },
     {
-      label: "Last Block",
+      label: heightParam ? "Block Time" : "Last Block",
       value: lastBlockTime ? timeAgo(lastBlockTime) : "—",
       accent: "green",
     },
-    {
-      label: "Peers",
-      value: Array.isArray(dumpConsensus?.result?.peers)
-        ? dumpConsensus.result.peers.length
-        : "—",
-      accent: "yellow",
-    }
+    ...(heightParam ? [] : [
+      {
+        label: "Peers",
+        value: Array.isArray(dumpConsensus?.result?.peers)
+          ? dumpConsensus.result.peers.length
+          : "—",
+        accent: "yellow" as AccentColor,
+      }
+    ])
   ];
 
   return (
@@ -319,6 +526,18 @@ export default function Home() {
         <section className="p-4 sm:p-8 mx-auto bg-[#1a1e24] rounded-xl shadow-lg">
           <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              {heightParam && (
+                <button
+                  onClick={() => {
+                    setSearchInput("");
+                    window.location.href = "/consensus";
+                  }}
+                  className="mr-2 p-2 text-gray-400 hover:text-white transition-colors"
+                  title="Go to live consensus page"
+                >
+                  <FontAwesomeIcon icon={faArrowLeft} size="lg" />
+                </button>
+              )}
               <h1 className="text-2xl font-bold text-white">Consensus State</h1>
 
               {NETWORK_NAME && (
@@ -328,33 +547,61 @@ export default function Home() {
               )}
             </div>
 
-            <button
-              onClick={() => {
-                if (paused) {
-                  setPaused(false);
-                  fetchData();
-                } else {
-                  setPaused(true);
-                }
-              }}
-              className={`px-3 py-1 rounded font-semibold hover:cursor-pointer ${paused ? "bg-green-700 hover:bg-green-600" : "bg-red-700 hover:bg-red-600"
-                }`}
-            >
-              {paused ? "Resume" : "Pause"}
-            </button>
+            <div className="flex items-center gap-4">
+              <div className="relative group">
+                <input
+                  type="text"
+                  placeholder="Search by height..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSearch();
+                  }}
+                  className="bg-[#0f1115] border border-gray-700 rounded-lg px-4 py-1.5 pl-10 text-sm focus:outline-none focus:border-blue-500 transition-all w-48 sm:w-64"
+                />
+                <FontAwesomeIcon
+                  icon={faSearch}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors pointer-events-none"
+                />
+                <button
+                  onClick={handleSearch}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-xs bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded transition-colors"
+                >
+                  Search
+                </button>
+              </div>
+
+              {!heightParam && (
+                <button
+                  onClick={() => {
+                    if (paused) {
+                      setPaused(false);
+                      fetchData();
+                    } else {
+                      setPaused(true);
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded font-semibold hover:cursor-pointer transition-colors ${paused ? "bg-green-700 hover:bg-green-600 text-white" : "bg-red-700 hover:bg-red-600 text-white"
+                    }`}
+                >
+                  {paused ? "Resume" : "Pause"}
+                </button>
+              )}
+            </div>
           </div>
 
 
-          {/* Summary Section */}
           <div className="mx-auto mb-8">
-            <h2 className="text-lg font-bold mb-2 text-cyan-300">
-              Consensus Progress for Current Block{height ? ` (${height.toLocaleString()})` : ""}
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold text-cyan-300">
+                Consensus Progress for {heightParam ? "Historical" : "Current"} Block{height ? ` (${height.toLocaleString()})` : ""}
+              </h2>
+              <span className="text-sm font-semibold text-white bg-blue-600/20 px-3 py-1 rounded border border-blue-500/30">{currentStep}</span>
+            </div>
             <div className="flex flex-col items-center w-full">
               <div className="relative w-full h-5 flex items-center">
                 <div className="absolute left-0 top-0 w-full h-3 bg-gray-700 rounded-full" />
 
-                <h1 className="z-10 text-sm font-semibold text-white">{currentStep}</h1>
                 <div
                   className={`absolute left-0 top-0 h-3 rounded-full transition-all duration-700 ${blockFlash ? "ring-4 ring-blue-300" : ""
                     }`}
@@ -565,8 +812,8 @@ export default function Home() {
                     </th>
                     <th className="px-4 py-2 text-left">Cumulative Voting Power</th>
                     <th className="px-4 py-2 text-left">Voted</th>
-                    <th className="px-4 py-2 text-left">Precommit</th>
-                    <th className="px-4 py-2 text-left">Latest Round</th>
+                    {!heightParam && <th className="px-4 py-2 text-left">Precommit</th>}
+                    {!heightParam && <th className="px-4 py-2 text-left">Latest Round</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -576,19 +823,25 @@ export default function Home() {
                     cumulative += votingPower;
                     const cumulativePercent = totalVotingPower ? ((cumulative / totalVotingPower) * 100).toFixed(2) : "0.00";
 
-                    let voted = false;
-                    let precommitted = false;
-                    const latestVoteSet = consensus?.height_vote_set?.[0];
-                    if (latestVoteSet) {
-                      voted = typeof latestVoteSet.prevotes?.[idx] === 'string' && !latestVoteSet.prevotes[idx].startsWith('nil');
-                      precommitted = typeof latestVoteSet.precommits?.[idx] === 'string' && !latestVoteSet.precommits[idx].startsWith('nil');
+                    const originalIdx = validators.findIndex(val => val.address === v.address);
+                    let voted = v.prevote || false;
+                    let precommitted = v.precommit || false;
+                    
+                    const latestVoteSet = consensus?.height_vote_set?.find((vs: any) => Number(vs.round) === round) 
+                                       || consensus?.height_vote_set?.[0];
+
+                    if (latestVoteSet && !heightParam && originalIdx !== -1) {
+                      voted = voted || (typeof latestVoteSet.prevotes?.[originalIdx] === 'string' && !latestVoteSet.prevotes[originalIdx].startsWith('nil'));
+                      precommitted = precommitted || (typeof latestVoteSet.precommits?.[originalIdx] === 'string' && !latestVoteSet.precommits[originalIdx].startsWith('nil'));
                     }
 
-                    const rowColor = favourites.includes(v.address)
-                      ? "bg-cyan-900"
-                      : voted
-                        ? "bg-green-900"
-                        : "bg-grey-900";
+                    const rowColor = heightParam
+                      ? (idx % 2 === 0 ? "bg-[#1a1e24]" : "bg-[#21262d]")
+                      : favourites.includes(v.address)
+                        ? "bg-cyan-900"
+                        : voted
+                          ? "bg-green-900"
+                          : "bg-gray-900";
 
                     return (
                       <tr key={v.address} className={`${rowColor} text-gray-100`}>
@@ -609,8 +862,8 @@ export default function Home() {
                         <td className="px-4 py-2">{votingPowerPercent}%</td>
                         <td className="px-4 py-2">{cumulativePercent}%</td>
                         <td className="px-4 py-2 text-center">{voted ? "✅" : "❌"}</td>
-                        <td className="px-4 py-2 text-center">{precommitted ? "✅" : "❌"}</td>
-                        <td className="px-4 py-2 text-center">{round}</td>
+                        {!heightParam && <td className="px-4 py-2 text-center">{precommitted ? "✅" : "❌"}</td>}
+                        {!heightParam && <td className="px-4 py-2 text-center">{round}</td>}
                       </tr>
                     );
                   })}
@@ -656,6 +909,15 @@ export default function Home() {
       </main>
 
       <Footer />
+
+      {errorMsg && (
+        <div className="fixed bottom-4 right-4 bg-red-600/90 text-white px-6 py-3 rounded shadow-lg z-50 flex items-center gap-3">
+          <span>{errorMsg}</span>
+          <button onClick={() => setErrorMsg(null)} className="text-white hover:text-gray-200 text-xl leading-none">
+            &times;
+          </button>
+        </div>
+      )}
     </div >
 
   );

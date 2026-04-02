@@ -57,11 +57,47 @@ CREATE TABLE IF NOT EXISTS blocks (
     next_validators_hash String,
 
     transactions UInt64,
+    txs_data Array(String),
+
+    evidence_hash String,
+
+    signatures String,
     
-    evidence_hash String
+    result_finalize_block JSON
 )
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(time)             
 ORDER BY (time, height)                 
-TTL time + INTERVAL 1 YEAR DELETE; 
+TTL time + INTERVAL 3 MONTH DELETE; 
+
+CREATE TABLE IF NOT EXISTS side_txs
+(
+    height UInt64,
+    time DateTime64(9, 'UTC'),
+    sidetx_commits JSON,
+    sidetx_summary JSON
+)
+ENGINE = MergeTree()
+PARTITION BY toYYYYMM(time)             
+ORDER BY height   
+TTL time + INTERVAL 3 MONTH DELETE;
+
+CREATE TABLE IF NOT EXISTS transactions (
+    txhash String,
+    height UInt64,
+    time DateTime64(9, 'UTC'),
+    sender String,
+    data String,
+    raw_log String DEFAULT '',
+    raw_tx String,
+    messages Array(JSON),
+    events String DEFAULT '[]',
+    gas_wanted UInt64,
+    gas_used UInt64,
+    fee String,
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(time)
+ORDER BY (height, txhash)
+TTL time + INTERVAL 3 MONTH DELETE;
 
