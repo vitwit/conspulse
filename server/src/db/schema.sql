@@ -72,15 +72,14 @@ TTL time + INTERVAL 3 MONTH DELETE;
 
 CREATE TABLE IF NOT EXISTS side_txs
 (
-    insert_id UUID,
     height UInt64,
     time DateTime64(9, 'UTC'),
-    sidetx_commits String,
-    sidetx_summary String
+    sidetx_commits JSON,
+    sidetx_summary JSON
 )
-ENGINE = ReplacingMergeTree()
+ENGINE = MergeTree()
 PARTITION BY toYYYYMM(time)             
-ORDER BY (height, insert_id)   
+ORDER BY height   
 TTL time + INTERVAL 3 MONTH DELETE;
 
 CREATE TABLE IF NOT EXISTS transactions (

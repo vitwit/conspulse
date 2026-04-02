@@ -13,7 +13,7 @@ import { createServer } from 'http';
 import { setupWebSocket } from './ws';
 import { Registry, decodeTxRaw } from "@cosmjs/proto-signing";
 import { VoteExtension } from './proto/heimdallv2/sidetxs/vote_ext';
-import { MsgCheckpoint } from './proto/heimdallv2/checkpoint/tx';
+import { MsgCheckpoint, MsgCpAck } from './proto/heimdallv2/checkpoint/tx';
 
 connectWS();
 
@@ -35,6 +35,7 @@ export const server = createServer(app);
         // Register your VoteExtension type
         registry.register("/heimdallv2.sidetxs.VoteExtension", VoteExtension);
         registry.register("/heimdallv2.checkpoint.MsgCheckpoint", MsgCheckpoint);
+        registry.register("/heimdallv2.checkpoint.MsgCpAck", MsgCpAck);
 
         app.use('/api', router);
 

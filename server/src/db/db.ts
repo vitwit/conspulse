@@ -115,9 +115,6 @@ export class Database {
             compression: {
                 response: true,
             },
-            clickhouse_settings: {
-                async_insert: 0,
-            }
         });
         this.nodes = [];
 
@@ -448,17 +445,10 @@ ORDER BY blockTime DESC;
 
     async insertSideTx(sideTx: SideTx): Promise<void> {
         try {
-            const row = {
-                insert_id: randomUUID(),  // unique per insert
-                height: sideTx.height,
-                time: sideTx.time,
-                sidetx_commits: JSON.stringify(sideTx.sidetx_commits),
-                sidetx_summary: JSON.stringify(sideTx.sidetx_summary),
-            };
 
             await this.client.insert({
                 table: 'side_txs',
-                values: [row],
+                values: [sideTx],
                 format: 'JSONEachRow',
             });
 

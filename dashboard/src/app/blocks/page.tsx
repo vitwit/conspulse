@@ -6,6 +6,7 @@ import Footer from "../components/Footer";
 import BlocksTable from "./BlocksTable";
 import { ChevronLeft, ChevronRight, RefreshCw, AlertCircle, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { SupportUS } from "../components/SupportUs";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
@@ -58,6 +59,8 @@ export default function BlocksPage() {
 
   return (
     <div className="min-h-screen bg-[#0e1014] flex flex-col font-sans">
+      <SupportUS />
+
       <Navbar shrink={false} />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-8">

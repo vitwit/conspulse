@@ -14,6 +14,7 @@ import {
 import moment from "moment";
 import { useRouter } from "next/navigation";
 import ShortName from "../components/ShortName";
+import { SupportUS } from "../components/SupportUs";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
@@ -64,6 +65,8 @@ export default function TransactionsPage() {
 
   return (
     <div className="min-h-screen bg-[#0e1014] flex flex-col font-sans">
+      <SupportUS />
+
       <Navbar shrink={false} />
       
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-8">
@@ -176,10 +179,10 @@ export default function TransactionsPage() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex flex-col items-end">
-                           <span className="text-gray-300 text-xs font-medium">{moment(tx.time).fromNow()}</span>
+                           <span className="text-gray-300 text-xs font-medium">{moment.utc(tx.time).local().fromNow()}</span>
                            <span className="text-gray-600 text-[10px] flex items-center gap-1">
                              <Clock size={10} />
-                             {moment(tx.time).format("HH:mm:ss")}
+                             {moment.utc(tx.time).local().format("HH:mm:ss")}
                            </span>
                         </div>
                       </td>

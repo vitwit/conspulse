@@ -119,11 +119,10 @@ export default function TransactionDetailPage() {
 
         {/* Status Badge */}
         <div className="flex items-center gap-3 mb-6">
-          <span className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ring-1 ${
-            isFailed
+          <span className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ring-1 ${isFailed
               ? "bg-red-500/10 text-red-400 ring-red-500/20"
               : "bg-green-500/10 text-green-400 ring-green-500/20"
-          }`}>
+            }`}>
             {isFailed ? <XCircle size={13} /> : <CheckCircle2 size={13} />}
             {isFailed ? "TRANSACTION FAILED" : "TRANSACTION SUCCESS"}
           </span>
@@ -161,10 +160,8 @@ export default function TransactionDetailPage() {
 
             <InfoRow label="Time">
               <span className="text-gray-200">
-                {moment(tx.time).format("YYYY-MM-DD[T]HH:mm:ss[Z]")}
-                <span className="text-gray-500 ml-2">
-                  ({moment(tx.time).format("MMM Do, YYYY, HH:mm:ss")})
-                </span>
+                {moment.utc(tx.time).local().toLocaleString()}
+                <span className="text-gray-500 ml-2">({moment.utc(tx.time).local().fromNow()})</span>
               </span>
             </InfoRow>
 
@@ -200,11 +197,10 @@ export default function TransactionDetailPage() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`pb-3 px-1 text-sm font-semibold capitalize transition-all border-b-2 -mb-px ${
-                activeTab === tab
+              className={`pb-3 px-1 text-sm font-semibold capitalize transition-all border-b-2 -mb-px ${activeTab === tab
                   ? "border-green-400 text-green-400"
                   : "border-transparent text-gray-500 hover:text-gray-300"
-              }`}
+                }`}
             >
               {tab === "messages" ? `Messages (${messages.length})` : tab === "events" ? "Event Logs" : "Raw Json"}
             </button>
@@ -246,7 +242,7 @@ export default function TransactionDetailPage() {
                 </div>
               )}
               <div className="bg-[#1a1e24] rounded-xl border border-[#2a2f3a] p-6">
-                <JsonViewer data={tx.events || []} initialExpanded={true} />
+                <JsonViewer data={JSON.parse(tx.events) || []} initialExpanded={true} />
               </div>
             </div>
           )}
@@ -255,7 +251,7 @@ export default function TransactionDetailPage() {
           {activeTab === "raw" && (
             <div className="pt-6">
               <div className="bg-[#1a1e24] rounded-xl border border-[#2a2f3a] p-6 overflow-auto max-h-[70vh]">
-                <JsonViewer data={tx} initialExpanded={false} />
+                <JsonViewer data={tx} initialExpanded={true} />
               </div>
             </div>
           )}

@@ -3,7 +3,7 @@ import { blockCache, cacheBlock } from './controllers/cache';
 import { DecodedTxRaw, decodeTxRaw } from "@cosmjs/proto-signing";
 import { ExtendedCommitInfo } from "./proto/tendermint/abci/types";
 import { VoteExtension } from './proto/heimdallv2/sidetxs/vote_ext';
-import { MsgCheckpoint } from './proto/heimdallv2/checkpoint/tx';
+import { MsgCheckpoint, MsgCpAck, MsgCpNoAck, MsgUpdateParams } from './proto/heimdallv2/checkpoint/tx';
 
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -271,7 +271,7 @@ export function connectWS(): void {
 
                     const height = Number(txResult.height)
                     const blockInfo = blockCache.find(x => x.blockNumber == height);
-                    const blockTime = blockInfo ? dayjs(blockInfo.blockTime).utc().format('YYYY-MM-DD HH:mm:ss.SSSSSSSSS') :
+                    const blockTime = blockInfo ? dayjs(blockInfo.time).utc().format('YYYY-MM-DD HH:mm:ss.SSSSSSSSS') :
                         dayjs.utc().format('YYYY-MM-DD HH:mm:ss.SSSSSSSSS')
 
                     const txRaw = isRealCosmosTx(txBytes)
@@ -325,7 +325,7 @@ async function handleRealTx(
 
         logger.debug(`✅ Real Tx: ${txhash}`);
 
-        const messages = txRaw.body.messages;
+        const messages = decodeMessages(txRaw.body.messages);
 
         // Sender from events
         const sender = events["message.sender"]?.[0] || '';
@@ -563,17 +563,6 @@ function mapBlockIdFlag(flag: number): string {
     }
 }
 
-function hasField(bytes: Uint8Array, fieldNumber: number): boolean {
-    const tag = (fieldNumber << 3) | 2; // length-delimited
-
-    for (let i = 0; i < bytes.length; i++) {
-        if (bytes[i] === tag) {
-            return true;
-        }
-    }
-    return false;
-}
-
 // Used to console bigInt included json without any issue
 function replacer(key: string, value: any) {
     if (typeof value === 'bigint') {
@@ -622,3 +611,65 @@ function formatVP(vp: number, total: number): string {
 function toEthHex(bytes: Uint8Array): string {
     return "0x" + Buffer.from(bytes).toString("hex");
 }
+
+function decodeMessages(messages: any[]): any[] {
+    return messages.map((msg: any) => {
+        try {
+            // Case where msg is already a JSON string
+            let actualMsg = msg;
+            if (typeof msg === 'string') {
+                try {
+                    actualMsg = JSON.parse(msg);
+                } catch {
+                    return msg;
+                }
+            }
+
+            if (!actualMsg || typeof actualMsg.typeUrl !== 'string') {
+                return msg;
+            }
+
+            // Clean the typeUrl (remove leading slashes if any)
+            const typeUrl = actualMsg.typeUrl.startsWith('/') ? actualMsg.typeUrl : `/${actualMsg.typeUrl}`;
+
+            if (typeUrl.includes("heimdallv2.checkpoint")) {
+                let binaryValue: Uint8Array | null = null;
+
+                if (actualMsg.value instanceof Uint8Array) {
+                    binaryValue = actualMsg.value;
+                } else if (typeof actualMsg.value === 'object' && actualMsg.value !== null) {
+                    // Handle the indexed-object format {"0": 10, "1": 42, ...}
+                    const keys = Object.keys(actualMsg.value).map(Number).sort((a, b) => a - b);
+                    binaryValue = new Uint8Array(keys.length);
+                    for (let i = 0; i < keys.length; i++) {
+                        binaryValue[i] = actualMsg.value[keys[i]];
+                    }
+                }
+
+                if (!binaryValue) return msg;
+
+                let decodedValue = null;
+                if (typeUrl === "/heimdallv2.checkpoint.MsgCheckpoint") {
+                    decodedValue = MsgCheckpoint.decode(binaryValue);
+                } else if (typeUrl === "/heimdallv2.checkpoint.MsgCpAck") {
+                    decodedValue = MsgCpAck.decode(binaryValue);
+                } else if (typeUrl === "/heimdallv2.checkpoint.MsgCpNoAck") {
+                    decodedValue = MsgCpNoAck.decode(binaryValue);
+                } else if (typeUrl === "/heimdallv2.checkpoint.MsgUpdateParams") {
+                    decodedValue = MsgUpdateParams.decode(binaryValue);
+                }
+
+                if (decodedValue) {
+                    return {
+                        typeUrl: typeUrl,
+                        value: decodedValue
+                    };
+                }
+            }
+        } catch (e) {
+            logger.error(`[RealTx] Failed to decode message ${msg?.typeUrl || 'unknown'}: ${e}`);
+        }
+        return msg;
+    });
+}
+

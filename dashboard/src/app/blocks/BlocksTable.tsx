@@ -76,11 +76,11 @@ const BlocksTable: React.FC<BlocksTableProps> = ({ blocks }) => {
                 <td className="px-6 py-4 whitespace-nowrap text-right">
                   <div className="flex flex-col items-end">
                     <span className="text-gray-200">
-                      {moment(block.time).format("MMM Do, YYYY")}
+                      {moment.utc(block.time).local().format("MMM Do, YYYY")}
                     </span>
                     <span className="text-gray-500 text-xs flex items-center gap-1">
                       <Clock size={10} />
-                      {moment(block.time).format("HH:mm:ss")} ({moment(block.time).fromNow()})
+                      {moment.utc(block.time).local().format("HH:mm:ss")} ({moment.utc(block.time).local().fromNow()})
                     </span>
                   </div>
                 </td>

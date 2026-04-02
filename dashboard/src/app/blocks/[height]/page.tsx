@@ -4,8 +4,8 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
-import { 
-  ChevronLeft, ChevronRight, Clock, Database, Hash, 
+import {
+  ChevronLeft, ChevronRight, Clock, Database, Hash,
   Layers, User, Zap, CheckCircle2, Info, Shield, Activity,
 } from "lucide-react";
 import moment from "moment";
@@ -14,7 +14,12 @@ import JsonViewer from "../../components/JsonViewer";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
-type Tab =  "side_tx" | "transactions" | "events" | "json";
+type Tab = "side_tx" | "transactions" | "events" | "json";
+type Signatures = [
+  {
+    block_id_flag: number,
+  }
+]
 
 export default function BlockDetailPage() {
   const { height } = useParams();
@@ -73,6 +78,8 @@ export default function BlockDetailPage() {
       block_tx: finalizeBlock.block_tx || null,
       consensus_param_updates: finalizeBlock.consensus_param_updates || null,
       validator_updates: finalizeBlock.validator_updates || null,
+      voted: ((JSON.parse(block.signatures) || []) as Signatures).filter(x => x.block_id_flag == 2).length,
+      total_validators: ((JSON.parse(block.signatures) || []) as Signatures).length,
     };
   }, [block]);
 
@@ -158,8 +165,8 @@ export default function BlockDetailPage() {
             </InfoRow>
             <InfoRow label="Time">
               <span className="text-gray-200">
-                {moment(blockData.time).format("YYYY-MM-DD[T]HH:mm:ss[Z]")}
-                <span className="text-gray-500 ml-2">({moment(blockData.time).fromNow()})</span>
+                {moment.utc(blockData.time).local().toLocaleString()}
+                <span className="text-gray-500 ml-2">({moment.utc(blockData.time).local().fromNow()})</span>
               </span>
             </InfoRow>
             <InfoRow label="Block Hash">
@@ -170,6 +177,9 @@ export default function BlockDetailPage() {
             </InfoRow>
             <InfoRow label="Proposer">
               <span className="text-blue-400 font-mono text-xs break-all">{blockData.proposer_address}</span>
+            </InfoRow>
+            <InfoRow label="Signatures">
+              <span className="text-gray-200 font-mono text-xs break-all">{blockData.voted}/{blockData.total_validators}</span>
             </InfoRow>
             <InfoRow label="TX Count">
               <span className="text-gray-200 font-mono">{blockData.transactions}</span>
@@ -232,11 +242,10 @@ export default function BlockDetailPage() {
                             </span>
                           </td>
                           <td className="px-6 py-4">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              tx.raw_log?.toLowerCase().includes("error")
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${tx.raw_log?.toLowerCase().includes("error")
                                 ? "bg-red-500/20 text-red-400"
                                 : "bg-green-500/20 text-green-400"
-                            }`}>
+                              }`}>
                               {tx.raw_log?.toLowerCase().includes("error") ? "FAILED" : "SUCCESS"}
                             </span>
                           </td>
@@ -328,8 +337,8 @@ export default function BlockDetailPage() {
                   </h3>
                 </div>
                 <div className="p-6">
-                  {sideTx?.sidetx_summary
-                    ? <JsonViewer data={sideTx.sidetx_summary} />
+                  {sideTx?.sideTx?.sidetx_summary
+                    ? <JsonViewer data={sideTx.sideTx.sidetx_summary} />
                     : <p className="text-gray-600 italic text-sm">No side tx summary at this height.</p>
                   }
                 </div>
@@ -342,8 +351,8 @@ export default function BlockDetailPage() {
                   </h3>
                 </div>
                 <div className="p-6">
-                  {sideTx?.sidetx_commits
-                    ? <JsonViewer data={sideTx.sidetx_commits} />
+                  {sideTx?.sideTx?.sidetx_commits
+                    ? <JsonViewer data={sideTx.sideTx.sidetx_commits} />
                     : <p className="text-gray-600 italic text-sm">No side tx commits at this height.</p>
                   }
                 </div>
@@ -389,11 +398,10 @@ function TabItem({ label, active, onClick, count }: any) {
   return (
     <button
       onClick={onClick}
-      className={`pb-3 px-1 text-sm font-semibold transition-all border-b-2 -mb-px whitespace-nowrap ${
-        active
+      className={`pb-3 px-1 text-sm font-semibold transition-all border-b-2 -mb-px whitespace-nowrap ${active
           ? "border-green-400 text-green-400"
           : "border-transparent text-gray-500 hover:text-gray-300"
-      }`}
+        }`}
     >
       <span className="flex items-center gap-2">
         {label}
