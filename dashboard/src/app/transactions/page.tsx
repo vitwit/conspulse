@@ -16,7 +16,7 @@ import { useRouter } from "next/navigation";
 import ShortName from "../components/ShortName";
 import { SupportUS } from "../components/SupportUs";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+const API_URL = process.env.NEXT_PUBLIC_METRICS_BACKEND_URL || "http://localhost:3001";
 
 export default function TransactionsPage() {
   const [txs, setTxs] = useState<any[]>([]);
@@ -28,7 +28,7 @@ export default function TransactionsPage() {
   const fetchTxs = async (p: number, isAuto = false) => {
     if (!isAuto) setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/txs?page=${p}&limit=25`);
+      const res = await fetch(`${API_URL}/api/txs?page=${p}&limit=25`);
       if (res.ok) {
         const data = await res.json();
         // Map DB fields to frontend-expected fields

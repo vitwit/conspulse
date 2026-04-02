@@ -8,7 +8,7 @@ import { ChevronLeft, ChevronRight, RefreshCw, AlertCircle, Search } from "lucid
 import { useRouter } from "next/navigation";
 import { SupportUS } from "../components/SupportUs";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+const API_URL = process.env.NEXT_PUBLIC_METRICS_BACKEND_URL || "http://localhost:3001";
 
 const LIMIT = 25;
 const REFRESH_INTERVAL = 1_000;
@@ -35,7 +35,7 @@ export default function BlocksPage() {
     if (!isAuto) setError(null);
 
     try {
-      const res = await fetch(`${API_URL}/blocks?page=${pageNum}&limit=${LIMIT}`);
+      const res = await fetch(`${API_URL}/api/blocks?page=${pageNum}&limit=${LIMIT}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setBlocks(data.blocks || []);

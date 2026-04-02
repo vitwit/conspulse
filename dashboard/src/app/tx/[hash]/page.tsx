@@ -11,7 +11,7 @@ import {
 import moment from "moment";
 import JsonViewer from "../../components/JsonViewer";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+const API_URL = process.env.NEXT_PUBLIC_METRICS_BACKEND_URL || "http://localhost:3001";
 
 type Tab = "messages" | "events" | "raw";
 
@@ -30,7 +30,7 @@ export default function TransactionDetailPage() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`${API_URL}/txs/${hash}`);
+        const res = await fetch(`${API_URL}/api/txs/${hash}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const raw = data.tx;

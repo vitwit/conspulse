@@ -12,7 +12,7 @@ import moment from "moment";
 import ShortName from "../../components/ShortName";
 import JsonViewer from "../../components/JsonViewer";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+const API_URL = process.env.NEXT_PUBLIC_METRICS_BACKEND_URL || "http://localhost:3001";
 
 type Tab = "side_tx" | "transactions" | "events" | "json";
 type Signatures = [
@@ -42,9 +42,9 @@ export default function BlockDetailPage() {
       try {
         // Fetch block, transactions, and side tx in parallel
         const [blockRes, txRes, sideTxRes] = await Promise.all([
-          fetch(`${API_URL}/blocks/${height}`),
-          fetch(`${API_URL}/txs?height=${height}`),
-          fetch(`${API_URL}/sideTx/${height}`),
+          fetch(`${API_URL}/api/blocks/${height}`),
+          fetch(`${API_URL}/api/txs?height=${height}`),
+          fetch(`${API_URL}/api/sideTx/${height}`),
         ]);
 
         if (!blockRes.ok) throw new Error(`HTTP ${blockRes.status}`);
@@ -78,8 +78,8 @@ export default function BlockDetailPage() {
       block_tx: finalizeBlock.block_tx || null,
       consensus_param_updates: finalizeBlock.consensus_param_updates || null,
       validator_updates: finalizeBlock.validator_updates || null,
-      voted: ((JSON.parse(block.signatures) || []) as Signatures).filter(x => x.block_id_flag == 2).length,
-      total_validators: ((JSON.parse(block.signatures) || []) as Signatures).length,
+      voted: ((block.signature? JSON.parse(block.signatures) : []) as Signatures).filter(x => x.block_id_flag == 2).length,
+      total_validators: (block.signature? JSON.parse(block.signatures) : []).length
     };
   }, [block]);
 
