@@ -396,7 +396,7 @@ ORDER BY blockTime DESC;
     ): Promise<Block[]> {
         const offset = (page - 1) * limit;
         const query = `
-        SELECT *
+        SELECT height, data_hash, proposer_address, transactions, time
         FROM blocks
         ORDER BY time DESC, height DESC
         LIMIT ${limit} OFFSET ${offset}
@@ -507,7 +507,7 @@ ORDER BY blockTime DESC;
     ): Promise<Transaction[]> {
         const offset = (page - 1) * limit;
         const query = `
-        SELECT *
+        SELECT txhash, height, raw_log, messages, time
         FROM transactions
         ORDER BY height DESC, time DESC
         LIMIT ${limit} OFFSET ${offset}

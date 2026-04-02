@@ -78,8 +78,8 @@ export default function BlockDetailPage() {
       block_tx: finalizeBlock.block_tx || null,
       consensus_param_updates: finalizeBlock.consensus_param_updates || null,
       validator_updates: finalizeBlock.validator_updates || null,
-      voted: ((block.signature? JSON.parse(block.signatures) : []) as Signatures).filter(x => x.block_id_flag == 2).length,
-      total_validators: (block.signature? JSON.parse(block.signatures) : []).length
+      voted: ((block.signatures? JSON.parse(block.signatures) : []) as Signatures).filter(x => x.block_id_flag == 2).length,
+      total_validators: (block.signatures? JSON.parse(block.signatures) : []).length
     };
   }, [block]);
 
