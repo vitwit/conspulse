@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-source-sans: var(--font-source-sans-3);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #fff;
+    --foreground: #000;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.hoverinfo {
+  background: #444;
+  /* color: #fff; */
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+@layer components {
+  .datamaps-bubble {
+    @apply animate-none;
+  }
+}
+
+svg .datamaps-bubble,
+svg circle {
+  animation: none !important;
+  transition: none !important;
+  opacity: 1 !important;
+}
+
+/* Hides scrollbar for all browsers */
+.scrollbar-hide {
+  scrollbar-width: none;
+  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE/Edge */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+  /* Chrome, Safari, Opera */
+}
+
+@keyframes fadeGreen {
+  0% {
+    background-color: #7fa582;
+  }
+
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-fadeGreen {
+  animation: fadeGreen 1s ease forwards;
+}
