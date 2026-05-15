@@ -1,0 +1,178 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Enterprise Design System — Conspulse
+   ============================================================ */
+:root {
+  /* Surfaces */
+  --bg-primary:   #0d1117;
+  --bg-surface:   #161b22;
+  --bg-elevated:  #21262d;
+  --bg-overlay:   #2d333b;
+
+  /* Borders */
+  --border-subtle:  #21262d;
+  --border-default: #30363d;
+  --border-muted:   #484f58;
+  --border-accent:  #388bfd;
+
+  /* Text */
+  --text-primary:   #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted:     #484f58;
+  --text-disabled:  #6e7681;
+
+  /* Accent palette */
+  --accent-blue:          #58a6ff;
+  --accent-blue-subtle:   rgba(88, 166, 255, 0.08);
+  --accent-green:         #3fb950;
+  --accent-green-subtle:  rgba(63, 185, 80, 0.08);
+  --accent-amber:         #e3b341;
+  --accent-amber-subtle:  rgba(227, 179, 65, 0.08);
+  --accent-red:           #f85149;
+  --accent-red-subtle:    rgba(248, 81, 73, 0.08);
+  --accent-cyan:          #39c5cf;
+  --accent-purple:        #bc8cff;
+
+  /* Legacy aliases */
+  --background: var(--bg-primary);
+  --foreground: var(--text-primary);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-source-sans: var(--font-source-sans-3);
+}
+
+/* ============================================================
+   Base Reset & Defaults
+   ============================================================ */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont,
+    'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
+}
+
+/* ============================================================
+   Custom Scrollbar
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bg-overlay);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-muted);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-overlay) var(--bg-primary);
+}
+
+/* ============================================================
+   Utility Classes
+   ============================================================ */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================================================
+   Datamaps (geo map) overrides
+   ============================================================ */
+.hoverinfo {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  pointer-events: none;
+  border: 1px solid var(--border-default);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+@layer components {
+  .datamaps-bubble {
+    @apply animate-none;
+  }
+}
+
+svg .datamaps-bubble,
+svg circle {
+  animation: none !important;
+  transition: none !important;
+  opacity: 1 !important;
+}
+
+/* ============================================================
+   Animations
+   ============================================================ */
+
+/* Row updated highlight */
+@keyframes fadeGreen {
+  0%   { background-color: rgba(63, 185, 80, 0.18); }
+  100% { background-color: transparent; }
+}
+.animate-fadeGreen {
+  animation: fadeGreen 1.8s ease forwards;
+}
+
+/* Pulse for live indicators */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.85); }
+}
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* Subtle slide-in */
+@keyframes slide-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-in-up {
+  animation: slide-in-up 0.25s ease forwards;
+}
+
+/* ============================================================
+   Glow utilities
+   ============================================================ */
+.glow-blue  { box-shadow: 0 0 24px rgba(88, 166, 255, 0.14); }
+.glow-green { box-shadow: 0 0 24px rgba(63, 185, 80, 0.14); }
+
+/* ============================================================
+   Enterprise Card
+   ============================================================ */
+.e-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.e-card:hover {
+  border-color: var(--border-muted);
+  box-shadow: 0 0 0 1px rgba(88, 166, 255, 0.08),
+              0 4px 16px rgba(0, 0, 0, 0.3);
+}
