@@ -28,7 +28,7 @@ export default function JsonViewer({ data, initialExpanded = null, level = 0, na
       <div className="relative">
         <button
           onClick={handleCopy}
-          className="absolute top-0 right-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-medium bg-[#2a2f3a] hover:bg-[#343a47] text-gray-400 hover:text-white transition-all z-10"
+          className="absolute top-0 right-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-medium border border-[var(--edge)] bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-white transition-all z-10 cursor-pointer"
           title="Copy JSON"
         >
           {copied ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
@@ -88,7 +88,7 @@ function JsonNode({ data, initialExpanded = null, level = 0, name = null, isLast
           {!isExpanded && <span className="text-gray-500 italic ml-2 cursor-pointer hover:text-gray-300" onClick={() => setIsExpanded(true)}>{data.length} items ]{!isLast && <span className="text-gray-500">,</span>}</span>}
         </div>
         {isExpanded && (
-          <div className="pl-4 border-l border-[#30363d] ml-[7px] mt-0.5 mb-0.5">
+          <div className="pl-4 border-l border-[rgba(148,163,184,0.15)] ml-[7px] mt-0.5 mb-0.5">
             {data.map((item, idx) => (
               <JsonNode key={idx} data={item} level={level + 1} isLast={idx === data.length - 1} initialExpanded={initialExpanded} />
             ))}
@@ -127,7 +127,7 @@ function JsonNode({ data, initialExpanded = null, level = 0, name = null, isLast
           {!isExpanded && <span className="text-gray-500 italic ml-2 cursor-pointer hover:text-gray-300" onClick={() => setIsExpanded(true)}>{keys.length} keys {"}"}{!isLast && <span className="text-gray-500">,</span>}</span>}
         </div>
         {isExpanded && (
-          <div className="pl-4 border-l border-[#30363d] ml-[7px] mt-0.5 mb-0.5">
+          <div className="pl-4 border-l border-[rgba(148,163,184,0.15)] ml-[7px] mt-0.5 mb-0.5">
             {keys.map((key, idx) => (
               <JsonNode key={key} name={key} data={data[key]} level={level + 1} isLast={idx === keys.length - 1} initialExpanded={initialExpanded} />
             ))}

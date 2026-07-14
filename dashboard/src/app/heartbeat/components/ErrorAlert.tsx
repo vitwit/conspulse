@@ -52,7 +52,7 @@ export function ErrorAlert({
   return (
     <div
       role="alert"
-      className="mb-6 p-4 bg-red-900/30 border border-red-700 text-red-300 rounded-lg shadow-inner animate-fade-in"
+      className="mb-6 p-4 bg-rose-500/[0.06] border border-rose-500/25 text-rose-300 rounded-xl animate-rise"
     >
       <div className="flex justify-between items-center mb-2">
         <p className="font-semibold text-red-200">

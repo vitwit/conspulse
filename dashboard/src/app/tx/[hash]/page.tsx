@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
 import {
-  Hash, Clock, Layers, Zap, CheckCircle2, XCircle,
+  Hash, CheckCircle2, XCircle,
   ArrowLeft, ChevronRight, Copy, Check
 } from "lucide-react";
 import moment from "moment";
@@ -60,10 +60,19 @@ export default function TransactionDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0e1014] flex flex-col">
+      <div className="min-h-screen flex flex-col">
         <Navbar shrink={false} />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+        <div className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6">
+          <div className="skeleton mb-6 h-6 w-72" />
+          <div className="skeleton mb-8 h-9 w-full max-w-2xl" />
+          <div className="card space-y-4 p-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex gap-6">
+                <div className="skeleton h-4 w-32" />
+                <div className="skeleton h-4 flex-1 max-w-xl" />
+              </div>
+            ))}
+          </div>
         </div>
         <Footer />
       </div>
@@ -72,15 +81,17 @@ export default function TransactionDetailPage() {
 
   if (error || !tx) {
     return (
-      <div className="min-h-screen bg-[#0e1014] flex flex-col">
+      <div className="min-h-screen flex flex-col">
         <Navbar shrink={false} />
-        <div className="flex-1 flex flex-col items-center justify-center gap-4">
-          <XCircle size={48} className="text-red-500" />
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 animate-rise">
+          <span className="flex h-16 w-16 items-center justify-center rounded-2xl border border-rose-500/25 bg-rose-500/[0.07]">
+            <XCircle size={28} className="text-rose-400" />
+          </span>
           <h2 className="text-2xl font-bold text-white">Transaction Not Found</h2>
-          <p className="text-gray-400 text-sm">{error}</p>
+          <p className="text-sm text-slate-500">{error}</p>
           <button
             onClick={() => router.push("/transactions")}
-            className="mt-4 px-6 py-2 bg-[#2a2f3a] text-white rounded-lg hover:bg-[#343a47] transition-colors"
+            className="mt-2 rounded-lg border border-[var(--edge)] bg-[var(--bg-panel)] px-6 py-2 text-sm font-semibold text-white transition-all hover:border-cyan-400/40 cursor-pointer"
           >
             Back to Transactions
           </button>
@@ -94,34 +105,34 @@ export default function TransactionDetailPage() {
   const messages = tx.messages || [];
 
   return (
-    <div className="min-h-screen bg-[#0e1014] flex flex-col font-sans">
+    <div className="min-h-screen flex flex-col">
       <Navbar shrink={false} />
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-8">
+      <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-8 sm:px-6">
         {/* Breadcrumb */}
-        <div className="flex items-center gap-3 mb-6">
+        <div className="mb-6 flex items-center gap-3 animate-rise">
           <button
             onClick={() => router.back()}
-            className="p-2 bg-[#1a1e24] border border-[#2a2f3a] rounded-lg text-gray-400 hover:text-white transition-all"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--edge)] bg-[var(--bg-panel)] text-slate-400 transition-all hover:border-cyan-400/40 hover:text-white cursor-pointer"
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft size={15} />
           </button>
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <span>Explorer</span>
-            <ChevronRight size={13} className="text-gray-700" />
-            <span className="cursor-pointer hover:text-gray-300" onClick={() => router.push("/transactions")}>
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <span className="text-slate-600">Explorer</span>
+            <ChevronRight size={13} className="text-slate-700" />
+            <span className="cursor-pointer transition-colors hover:text-cyan-300" onClick={() => router.push("/transactions")}>
               Transactions
             </span>
-            <ChevronRight size={13} className="text-gray-700" />
-            <span className="text-white font-mono text-xs">{tx.hash?.substring(0, 16)}...{tx.hash?.slice(-8)}</span>
+            <ChevronRight size={13} className="text-slate-700" />
+            <span className="font-mono text-xs text-white">{tx.hash?.substring(0, 16)}...{tx.hash?.slice(-8)}</span>
           </div>
         </div>
 
         {/* Status Badge */}
-        <div className="flex items-center gap-3 mb-6">
-          <span className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ring-1 ${isFailed
-              ? "bg-red-500/10 text-red-400 ring-red-500/20"
-              : "bg-green-500/10 text-green-400 ring-green-500/20"
+        <div className="mb-6 flex items-center gap-3 animate-rise">
+          <span className={`flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-bold ring-1 ${isFailed
+            ? "bg-rose-500/10 text-rose-300 ring-rose-500/25"
+            : "bg-emerald-500/10 text-emerald-300 ring-emerald-500/25"
             }`}>
             {isFailed ? <XCircle size={13} /> : <CheckCircle2 size={13} />}
             {isFailed ? "TRANSACTION FAILED" : "TRANSACTION SUCCESS"}
@@ -129,29 +140,31 @@ export default function TransactionDetailPage() {
         </div>
 
         {/* Hash Row */}
-        <div className="flex items-center gap-3 mb-8">
-          <Hash size={18} className="text-gray-500 shrink-0" />
-          <span className="text-white font-mono text-sm break-all">{tx.hash}</span>
+        <div className="mb-8 flex items-center gap-3 animate-rise">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--edge)] bg-[var(--bg-panel)]">
+            <Hash size={15} className="text-cyan-400" />
+          </span>
+          <span className="break-all font-mono text-sm text-white">{tx.hash}</span>
           <button
             onClick={copyHash}
-            className="shrink-0 p-1.5 rounded text-gray-500 hover:text-white hover:bg-[#2a2f3a] transition-all"
+            className="shrink-0 rounded-md p-1.5 text-slate-500 transition-all hover:bg-white/[0.06] hover:text-white cursor-pointer"
           >
-            {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+            {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
           </button>
         </div>
 
         {/* Transaction Info Table */}
-        <div className="bg-[#1a1e24] rounded-xl border border-[#2a2f3a] mb-8 overflow-hidden">
-          <div className="px-6 py-4 border-b border-[#2a2f3a] bg-[#1d2127]">
-            <h2 className="text-sm font-bold text-gray-300 uppercase tracking-widest">
+        <div className="card mb-8 overflow-hidden animate-rise">
+          <div className="border-b border-[var(--edge)] bg-white/[0.02] px-6 py-4">
+            <h2 className="section-title">
               Transaction Information
             </h2>
           </div>
 
-          <div className="divide-y divide-[#2a2f3a]">
+          <div className="divide-y divide-white/[0.05]">
             <InfoRow label="Height">
               <span
-                className="text-green-400 font-mono cursor-pointer hover:underline"
+                className="cursor-pointer font-mono text-emerald-400 transition-colors hover:text-emerald-300 hover:underline underline-offset-4"
                 onClick={() => router.push(`/blocks/${tx.height}`)}
               >
                 {tx.height?.toLocaleString()}
@@ -159,47 +172,47 @@ export default function TransactionDetailPage() {
             </InfoRow>
 
             <InfoRow label="Time">
-              <span className="text-gray-200">
+              <span className="text-slate-200">
                 {moment.utc(tx.time).local().toLocaleString()}
-                <span className="text-gray-500 ml-2">({moment.utc(tx.time).local().fromNow()})</span>
+                <span className="ml-2 text-slate-500">({moment.utc(tx.time).local().fromNow()})</span>
               </span>
             </InfoRow>
 
             <InfoRow label="Gas Used / Wanted">
-              <span className="text-gray-200 font-mono">
+              <span className="font-mono text-slate-200">
                 {(tx.gas_used || 0).toLocaleString()}
-                <span className="text-gray-500"> / </span>
+                <span className="text-slate-500"> / </span>
                 {(tx.gas_wanted || 0).toLocaleString()}
               </span>
             </InfoRow>
 
             <InfoRow label="Fee">
-              <span className="text-gray-200 font-mono">{tx.fee_amount || "0"}</span>
+              <span className="font-mono text-slate-200">{tx.fee_amount || "0"}</span>
             </InfoRow>
 
             <InfoRow label="Memo">
-              <span className={tx.memo ? "text-gray-200" : "text-gray-600"}>
+              <span className={tx.memo ? "text-slate-200" : "text-slate-600"}>
                 {tx.memo || "—"}
               </span>
             </InfoRow>
 
             {tx.sender && (
               <InfoRow label="Sender">
-                <span className="text-blue-400 font-mono text-xs break-all">{tx.sender}</span>
+                <span className="break-all font-mono text-xs text-cyan-400">{tx.sender}</span>
               </InfoRow>
             )}
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-[#2a2f3a] flex gap-6 mb-0">
+        <div className="mb-0 flex gap-6 border-b border-[var(--edge)]">
           {(["messages", "events", "raw"] as Tab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`pb-3 px-1 text-sm font-semibold capitalize transition-all border-b-2 -mb-px ${activeTab === tab
-                  ? "border-green-400 text-green-400"
-                  : "border-transparent text-gray-500 hover:text-gray-300"
+              className={`-mb-px border-b-2 px-1 pb-3 text-sm font-semibold capitalize transition-all cursor-pointer ${activeTab === tab
+                ? "border-cyan-400 text-cyan-300"
+                : "border-transparent text-slate-500 hover:text-slate-300"
                 }`}
             >
               {tab === "messages" ? `Messages (${messages.length})` : tab === "events" ? "Event Logs" : "Raw Json"}
@@ -208,12 +221,12 @@ export default function TransactionDetailPage() {
         </div>
 
         {/* Tab Content */}
-        <div className="mt-0">
+        <div className="mt-0 animate-rise" key={activeTab}>
           {/* Messages Tab */}
           {activeTab === "messages" && (
             <div className="space-y-4 pt-6">
               {messages.length === 0 ? (
-                <div className="bg-[#1a1e24] rounded-xl border border-[#2a2f3a] p-12 text-center text-gray-500 italic text-sm">
+                <div className="card p-12 text-center text-sm text-slate-500">
                   No messages found in this transaction.
                 </div>
               ) : (
@@ -228,20 +241,20 @@ export default function TransactionDetailPage() {
           {activeTab === "events" && (
             <div className="pt-6">
               {isFailed && tx.raw_log && (
-                <div className="bg-[#1a1e24] rounded-xl border border-red-900/30 overflow-hidden mb-4">
-                  <div className="px-6 py-3 border-b border-red-900/30 bg-red-500/5">
-                    <h3 className="text-xs font-bold text-red-400 uppercase tracking-widest flex items-center gap-2">
+                <div className="card mb-4 overflow-hidden !border-rose-500/25">
+                  <div className="border-b border-rose-500/20 bg-rose-500/[0.05] px-6 py-3">
+                    <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-rose-400">
                       <XCircle size={13} /> Error Log
                     </h3>
                   </div>
                   <div className="p-6">
-                    <pre className="text-red-300 font-mono text-xs leading-relaxed whitespace-pre-wrap">
+                    <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-rose-300">
                       {tx.raw_log}
                     </pre>
                   </div>
                 </div>
               )}
-              <div className="bg-[#1a1e24] rounded-xl border border-[#2a2f3a] p-6">
+              <div className="card p-6">
                 <JsonViewer data={JSON.parse(tx.events) || []} initialExpanded={true} />
               </div>
             </div>
@@ -250,7 +263,7 @@ export default function TransactionDetailPage() {
           {/* Raw JSON Tab */}
           {activeTab === "raw" && (
             <div className="pt-6">
-              <div className="bg-[#1a1e24] rounded-xl border border-[#2a2f3a] p-6 overflow-auto max-h-[70vh]">
+              <div className="card max-h-[70vh] overflow-auto p-6">
                 <JsonViewer data={tx} initialExpanded={true} />
               </div>
             </div>
@@ -270,28 +283,30 @@ function MessageCard({ msg, index }: { msg: any; index: number }) {
   const msgCategory = msg.typeUrl?.split(".").slice(-2, -1)[0] || "";
 
   return (
-    <div className="bg-[#1a1e24] rounded-xl border border-[#2a2f3a] overflow-hidden">
+    <div className="card overflow-hidden">
       {/* Header */}
       <button
         onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center justify-between px-6 py-4 hover:bg-white/5 transition-colors text-left"
+        className="flex w-full items-center justify-between px-6 py-4 text-left transition-colors hover:bg-white/[0.03] cursor-pointer"
       >
         <div className="flex items-center gap-3">
-          <span className="text-gray-500 font-mono text-sm font-bold">#{index + 1}.</span>
-          <span className="text-white font-semibold text-sm">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-400/10 font-mono text-xs font-bold text-cyan-300">
+            {index + 1}
+          </span>
+          <span className="text-sm font-semibold text-white">
             {msgCategory ? `${msgCategory} : ` : ""}
-            <span className="text-blue-300">{msgType}</span>
+            <span className="text-cyan-300">{msgType}</span>
           </span>
         </div>
         <ChevronRight
           size={16}
-          className={`text-gray-500 transition-transform ${expanded ? "rotate-90" : ""}`}
+          className={`text-slate-500 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`}
         />
       </button>
 
       {/* Body */}
       {expanded && (
-        <div className="border-t border-[#2a2f3a] px-6 py-5">
+        <div className="border-t border-[var(--edge)] px-6 py-5">
           {/* Pull out key fields cleanly if available */}
           {msg.senderAddress && (
             <MsgRow label="Sender" value={msg.senderAddress} mono />
@@ -311,8 +326,8 @@ function MessageCard({ msg, index }: { msg: any; index: number }) {
 
           {/* Full message JSON */}
           <div className="mt-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-2">Messages:</p>
-            <div className="bg-[#13161c] rounded-lg p-4 border border-[#2a2f3a]">
+            <p className="section-title mb-2">Messages</p>
+            <div className="rounded-lg border border-[var(--edge)] bg-[#04060c]/70 p-4">
               <JsonViewer data={msg} initialExpanded={true} />
             </div>
           </div>
@@ -324,11 +339,11 @@ function MessageCard({ msg, index }: { msg: any; index: number }) {
 
 function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-4 px-6 py-4 gap-4 items-start">
-      <div className="text-gray-500 text-xs font-semibold uppercase tracking-wider pt-0.5">
+    <div className="grid grid-cols-1 gap-1 px-6 py-4 sm:grid-cols-4 sm:gap-4 sm:items-start">
+      <div className="pt-0.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
         {label}
       </div>
-      <div className="col-span-3 text-sm leading-relaxed">
+      <div className="text-sm leading-relaxed sm:col-span-3">
         {children}
       </div>
     </div>
@@ -338,8 +353,8 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
 function MsgRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="mb-3">
-      <p className="text-xs text-gray-500 font-semibold mb-1">{label}:</p>
-      <p className={`text-gray-200 text-sm break-all ${mono ? "font-mono" : ""}`}>{value}</p>
+      <p className="mb-1 text-xs font-semibold text-slate-500">{label}:</p>
+      <p className={`break-all text-sm text-slate-200 ${mono ? "font-mono" : ""}`}>{value}</p>
     </div>
   );
 }

@@ -9,90 +9,94 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 const NETWORK_NAME = process.env.NEXT_PUBLIC_NETWORK_NAME || "the network";
 
+const SOCIALS = [
+  { href: "mailto:contact@vitwit.com", icon: faEnvelope, label: "Email" },
+  { href: "https://t.me/vitwit", icon: faTelegram, label: "Telegram" },
+  { href: "https://twitter.com/vitwit", icon: faTwitter, label: "Twitter" },
+  { href: "https://github.com/vitwit", icon: faGithub, label: "GitHub" },
+];
+
 export default function Footer() {
   return (
-    <footer className="w-full bg-[#13161c] border-t border-[#1f232b] px-4 pt-10 pb-6 text-sm text-gray-400">
-      <div className="mx-auto w-full flex flex-col sm:flex-row justify-between gap-10 pl-6 pr-6">
-        {/* Left: About */}
-        <div className="flex-1 min-w-[240px]">
-          <div className="flex items-center mb-3">
-            <img src="/conspulse-logo.svg" alt="Conspulse Logo" className="h-8 w-8 mr-2" />
-            <span className="font-semibold text-lg text-white">Conspulse</span>
+    <footer className="mt-16 border-t border-[var(--edge)] bg-[#04060c]/80">
+      <div className="mx-auto max-w-[1600px] px-6 pb-8 pt-12">
+        <div className="flex flex-col justify-between gap-10 sm:flex-row">
+          {/* Left: About */}
+          <div className="max-w-xl">
+            <div className="mb-4 flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--edge)] bg-[var(--bg-panel)]">
+                <img src="/conspulse-logo.svg" alt="Conspulse Logo" className="h-5 w-5" />
+              </span>
+              <span className="text-lg font-bold tracking-tight text-white">
+                Cons<span className="text-gradient">pulse</span>
+              </span>
+            </div>
+            <p className="text-sm leading-relaxed text-slate-400">
+              A real-time consensus dashboard for Tendermint (CometBFT) based networks like{" "}
+              <span className="font-semibold text-cyan-400">{NETWORK_NAME}</span>. Live consensus
+              state, validator tracking, and network insights to monitor performance and health.
+            </p>
+            <p className="mt-3 text-sm text-slate-500">
+              Support us by delegating to the{" "}
+              <a
+                href="https://staking.polygon.technology/validators/50"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-cyan-400 transition-colors hover:text-cyan-300"
+              >
+                Vitwit Validator
+              </a>
+              .
+            </p>
           </div>
-          <h3 className="font-semibold text-base text-gray-300 mb-1">About Conspulse</h3>
-          <p className="text-gray-400 leading-relaxed text-sm">
-            <span className="font-bold text-white">Conspulse</span> Conspulse is a consensus dashboard for Tendermint (CometBFT) based networks like{" "}
-            <span className="font-semibold text-cyan-400">{NETWORK_NAME}</span>. It provides real-time consensus state, validator tracking, and network
-            insights to help monitor performance and health. Support us by delegating to the{" "}
-            <span className="text-cyan-400 font-semibold"><a href="https://staking.polygon.technology/validators/50" target="_blank" >Vitwit Validator</a></span>.
-          </p>
+
+          {/* Right: Socials and Attribution */}
+          <div className="flex flex-col items-start gap-4 sm:items-end">
+            <div className="flex gap-2">
+              {SOCIALS.map((s) => (
+                <a
+                  key={s.label}
+                  href={s.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={s.label}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--edge)] bg-[var(--bg-panel)] text-slate-400 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-400/40 hover:text-cyan-300 hover:shadow-[0_0_16px_rgba(34,211,238,0.15)]"
+                >
+                  <FontAwesomeIcon icon={s.icon} />
+                </a>
+              ))}
+            </div>
+
+            <div className="flex flex-col gap-1.5 text-sm text-slate-500 sm:items-end">
+              <span>
+                Powered by{" "}
+                <a
+                  href="https://vitwit.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-cyan-400 transition-colors hover:text-cyan-300"
+                >
+                  Vitwit
+                </a>
+              </span>
+              <span className="flex items-center gap-1.5">
+                Supported by{" "}
+                <a
+                  href="https://polygon.technology"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 font-semibold text-purple-400 transition-colors hover:text-purple-300"
+                >
+                  Polygon
+                  <img src="/polygon-logo.svg" alt="Polygon Logo" className="h-4 w-4" />
+                </a>
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* Right: Socials and Attribution */}
-        <div className="flex-1 flex flex-col items-start sm:items-end gap-3">
-          <div className="flex gap-5">
-            <a
-              href="mailto:contact@vitwit.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Email"
-              className="hover:text-green-600 transition-transform hover:scale-110"
-            >
-              <FontAwesomeIcon icon={faEnvelope} size="lg" />
-            </a>
-            <a
-              href="https://t.me/vitwit"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Telegram"
-              className="hover:text-green-600  transition-transform hover:scale-110"
-            >
-              <FontAwesomeIcon icon={faTelegram} size="lg" />
-            </a>
-            <a
-              href="https://twitter.com/vitwit"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Twitter"
-              className="hover:text-green-600  transition-transform hover:scale-110"
-            >
-              <FontAwesomeIcon icon={faTwitter} size="lg" />
-            </a>
-            <a
-              href="https://github.com/vitwit"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="GitHub"
-              className="hover:text-green-600  transition-transform hover:scale-110"
-            >
-              <FontAwesomeIcon icon={faGithub} size="lg" />
-            </a>
-          </div>
-
-          <div className="flex items-center gap-2 mt-3">
-            <span>Powered by</span>
-            <a
-              href="https://vitwit.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-cyan-400 hover:underline"
-            >
-              Vitwit
-            </a>
-          </div>
-
-          <div className="flex items-center gap-2 mt-1">
-            <span>Supported by</span>
-            <a
-              href="https://polygon.technology"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-purple-400 hover:underline flex items-center gap-1"
-            >
-              Polygon
-              <img src="/polygon-logo.svg" alt="Polygon Logo" className="h-4 w-4 inline" />
-            </a>
-          </div>
+        <div className="mt-10 border-t border-[var(--edge)] pt-5 text-center text-xs text-slate-600">
+          © {new Date().getFullYear()} Conspulse — Tendermint Validator Dashboard
         </div>
       </div>
     </footer>

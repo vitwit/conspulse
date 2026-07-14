@@ -69,7 +69,7 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${sourceSans3.variable} antialiased bg-[#0e1014]`}
+        className={`${geistSans.variable} ${geistMono.variable} ${sourceSans3.variable} antialiased`}
       >
         <TendermintProvider >
           <TendermintHistoryProvider >

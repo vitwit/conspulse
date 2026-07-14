@@ -3,13 +3,13 @@
 import React, { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { 
-  Search, 
-  ChevronLeft, 
-  ChevronRight, 
-  Clock, 
+import {
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
   RotateCw,
-  Hash,
+  ArrowLeftRight,
 } from "lucide-react";
 import moment from "moment";
 import { useRouter } from "next/navigation";
@@ -64,42 +64,42 @@ export default function TransactionsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0e1014] flex flex-col font-sans">
+    <div className="min-h-screen flex flex-col">
       <SupportUS />
 
       <Navbar shrink={false} />
-      
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+
+      <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 sm:px-6">
+        <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center animate-rise">
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-              <Hash className="text-blue-500" size={24} />
+            <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight text-white">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--edge)] bg-[var(--bg-panel)]">
+                <ArrowLeftRight size={17} className="text-cyan-400" />
+              </span>
               Transactions
             </h1>
-            <p className="text-gray-400 text-sm mt-1">
+            <p className="mt-1 text-sm text-slate-500">
               Real-time transaction monitoring and decoding
             </p>
           </div>
 
-          <div className="flex items-center gap-4">
-            <button 
-                onClick={() => setAutoRefresh(!autoRefresh)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    autoRefresh 
-                    ? "bg-green-500/10 text-green-400 border border-green-500/20" 
-                    : "bg-[#1a1e24] text-gray-500 border border-[#2a2f3a]"
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-all cursor-pointer ${autoRefresh
+                ? "border-emerald-400/25 bg-emerald-400/[0.08] text-emerald-300"
+                : "border-[var(--edge)] bg-[var(--bg-panel)] text-slate-500 hover:text-slate-300"
                 }`}
             >
-                <RotateCw size={14} className={autoRefresh ? "animate-spin-slow" : ""} />
-                {autoRefresh ? "Auto Refresh On" : "Auto Refresh Off"}
+              <RotateCw size={14} className={autoRefresh ? "animate-spin-slow" : ""} />
+              {autoRefresh ? "Auto Refresh On" : "Auto Refresh Off"}
             </button>
-            
-            <div className="flex items-center bg-[#1a1e24] border border-[#2a2f3a] rounded-lg px-3 py-2 focus-within:border-blue-500/50 transition-all">
-              <Search size={18} className="text-gray-500" />
-              <input 
-                type="text" 
-                placeholder="Search by TX Hash..." 
-                className="bg-transparent border-none outline-none text-white text-sm ml-2 w-64"
+
+            <div className="group relative">
+              <input
+                type="text"
+                placeholder="Search by TX hash..."
+                className="w-64 rounded-lg border border-[var(--edge)] bg-[var(--bg-panel)] py-2 pl-9 pr-3 text-sm text-white placeholder:text-slate-600 transition-all focus:border-cyan-400/50 focus:outline-none focus:ring-2 focus:ring-cyan-400/10"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     const val = (e.target as HTMLInputElement).value.trim();
@@ -107,83 +107,89 @@ export default function TransactionsPage() {
                   }
                 }}
               />
+              <Search
+                size={15}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 transition-colors group-focus-within:text-cyan-400"
+              />
             </div>
           </div>
         </div>
 
-        <div className="bg-[#1a1e24] rounded-xl border border-[#2a2f3a] overflow-hidden shadow-2xl flex flex-col">
-          <div className="overflow-x-auto flex-1">
-            <table className="min-w-full text-sm text-left">
+        <div className="card flex flex-col overflow-hidden animate-rise">
+          <div className="flex-1 overflow-x-auto">
+            <table className="tbl">
               <thead>
-                <tr className="bg-[#21262d] text-gray-400 font-semibold uppercase tracking-wider text-[10px]">
-                  <th className="px-6 py-4">TX Hash</th>
-                  <th className="px-6 py-4">Height</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Messages</th>
-                  <th className="px-6 py-4 text-right">Time</th>
+                <tr>
+                  <th>TX Hash</th>
+                  <th>Height</th>
+                  <th>Status</th>
+                  <th>Messages</th>
+                  <th className="!text-right">Time</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#2a2f3a]">
+              <tbody>
                 {loading && txs.length === 0 ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i} className="animate-pulse">
-                      <td colSpan={5} className="px-6 py-8 bg-[#1a1e24]/50"></td>
+                  Array.from({ length: 8 }).map((_, i) => (
+                    <tr key={i}>
+                      <td colSpan={5} className="!py-4">
+                        <div className="skeleton h-5 w-full" />
+                      </td>
                     </tr>
                   ))
                 ) : txs.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500 italic">
+                    <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
                       No transactions found.
                     </td>
                   </tr>
                 ) : (
                   txs.map((tx) => (
-                    <tr 
-                      key={tx.hash} 
-                      className="hover:bg-white/5 transition-colors cursor-pointer group"
+                    <tr
+                      key={tx.hash}
+                      className="group cursor-pointer"
                       onClick={() => handleTxClick(tx.hash)}
                     >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                           <span className="text-blue-400 font-mono group-hover:text-blue-300 transition-colors">
-                            <ShortName value={tx.hash} maxLength={16} />
-                          </span>
-                        </div>
+                      <td>
+                        <span className="font-mono text-cyan-400 transition-colors group-hover:text-cyan-300">
+                          <ShortName value={tx.hash} maxLength={16} />
+                        </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className="text-gray-300 font-mono" onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/blocks/${tx.height}`);
-                        }}>
+                      <td>
+                        <span
+                          className="font-mono text-emerald-400/90 transition-colors hover:text-emerald-300 hover:underline underline-offset-4"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/blocks/${tx.height}`);
+                          }}
+                        >
                           {tx.height.toLocaleString()}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          !tx.success ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"
-                        }`}>
+                      <td>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${!tx.success ? "bg-rose-500/15 text-rose-400" : "bg-emerald-500/15 text-emerald-400"
+                          }`}>
                           {!tx.success ? "FAILED" : "SUCCESS"}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                         <div className="flex flex-wrap gap-1">
-                            {(tx.messages || []).map((msg: any, idx: number) => (
-                              <span key={idx} className="bg-[#2a2f3a] px-2 py-0.5 rounded text-[10px] text-gray-400 uppercase tracking-tight">
-                                {msg.typeUrl?.split('.').pop() || "Unknown"}
-                              </span>
-                            ))}
-                            {(!tx.messages || tx.messages.length === 0) && (
-                              <span className="text-gray-600 italic text-[10px]">No messages</span>
-                            )}
-                         </div>
+                      <td>
+                        <div className="flex flex-wrap gap-1">
+                          {(tx.messages || []).map((msg: any, idx: number) => (
+                            <span key={idx} className="rounded-md border border-[var(--edge)] bg-white/[0.03] px-2 py-0.5 text-[10px] uppercase tracking-tight text-slate-400">
+                              {msg.typeUrl?.split('.').pop() || "Unknown"}
+                            </span>
+                          ))}
+                          {(!tx.messages || tx.messages.length === 0) && (
+                            <span className="text-[10px] text-slate-600">No messages</span>
+                          )}
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="!text-right">
                         <div className="flex flex-col items-end">
-                           <span className="text-gray-300 text-xs font-medium">{moment.utc(tx.time).local().fromNow()}</span>
-                           <span className="text-gray-600 text-[10px] flex items-center gap-1">
-                             <Clock size={10} />
-                             {moment.utc(tx.time).local().format("HH:mm:ss")}
-                           </span>
+                          <span className="text-xs font-medium text-slate-300">{moment.utc(tx.time).local().fromNow()}</span>
+                          <span className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
+                            <Clock size={10} />
+                            {moment.utc(tx.time).local().format("HH:mm:ss")}
+                          </span>
                         </div>
                       </td>
                     </tr>
@@ -194,25 +200,25 @@ export default function TransactionsPage() {
           </div>
 
           {/* Pagination */}
-          <div className="bg-[#21262d] px-6 py-4 flex items-center justify-between border-t border-[#2a2f3a] mt-auto">
-            <span className="text-xs text-gray-500 font-medium">
-              Showing <span className="text-gray-300">{txs.length}</span> transactions
+          <div className="mt-auto flex items-center justify-between border-t border-[var(--edge)] bg-white/[0.02] px-6 py-4">
+            <span className="text-xs font-medium text-slate-500">
+              Showing <span className="text-slate-300">{txs.length}</span> transactions
             </span>
             <div className="flex items-center gap-2">
-              <button 
+              <button
                 onClick={() => setPage(Math.max(1, page - 1))}
                 disabled={page === 1}
-                className="p-2 rounded bg-[#1a1e24] border border-[#2a2f3a] text-gray-500 hover:text-white disabled:opacity-30 transition-all shadow-inner"
+                className="rounded-lg border border-[var(--edge)] bg-[var(--bg-panel)] p-2 text-slate-400 transition-all hover:border-cyan-400/40 hover:text-white disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
               >
                 <ChevronLeft size={16} />
               </button>
-              <div className="px-4 py-1.5 bg-[#0e1014] border border-[#2a2f3a] rounded font-mono text-xs text-blue-400 font-bold">
+              <div className="rounded-lg border border-[var(--edge)] bg-[var(--bg-panel)] px-4 py-1.5 font-mono text-xs font-bold text-cyan-300">
                 PAGE {page}
               </div>
-              <button 
+              <button
                 onClick={() => setPage(page + 1)}
                 disabled={txs.length < 25}
-                className="p-2 rounded bg-[#1a1e24] border border-[#2a2f3a] text-gray-500 hover:text-white disabled:opacity-30 transition-all shadow-inner"
+                className="rounded-lg border border-[var(--edge)] bg-[var(--bg-panel)] p-2 text-slate-400 transition-all hover:border-cyan-400/40 hover:text-white disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
               >
                 <ChevronRight size={16} />
               </button>
@@ -220,18 +226,8 @@ export default function TransactionsPage() {
           </div>
         </div>
       </main>
-      
-      <Footer />
 
-      <style jsx global>{`
-        @keyframes spin-slow {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        .animate-spin-slow {
-          animation: spin-slow 3s linear infinite;
-        }
-      `}</style>
+      <Footer />
     </div>
   );
 }

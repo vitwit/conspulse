@@ -10,16 +10,13 @@ import { SupportUS } from "../components/SupportUs";
 import { useWebSocket } from "../context/WebsocketContext";
 import { Stats } from "../types/ws";
 import CopyButton from "../components/CopyButton";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faClipboard, faCheck, faSearch, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
+import {
+  Search, ArrowLeft, Pause, Play, Check, X as XIcon,
+  ChevronUp, ChevronDown, Star,
+} from "lucide-react";
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
 const NETWORK_NAME = process.env.NEXT_PUBLIC_NETWORK_NAME || "";
-
-function parseHeightRoundStep(str: string) {
-  const [height, round] = str.split("/");
-  return { height: Number(height), round: Number(round) };
-}
 
 const shorten = (str: string, chars = 6): string => {
   if (!str) return '';
@@ -45,7 +42,7 @@ type AccentColor = "blue" | "green" | "yellow" | "purple";
 
 export default function Home() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0f1115] text-white flex items-center justify-center">Loading...</div>}>
+    <Suspense fallback={<div className="min-h-screen text-white flex items-center justify-center">Loading...</div>}>
       <ConsensusStatePage />
     </Suspense>
   );
@@ -295,7 +292,6 @@ function ConsensusStatePage() {
         const [h, r, s] = stateStr.split("/");
         const rpcHeight = Number(h);
         const currentRound = Number(r);
-        const currentStepNum = Number(s);
 
         const displayHeight = rpcHeight;
         setHeight(displayHeight);
@@ -443,17 +439,10 @@ function ConsensusStatePage() {
   ];
 
   const colorMap: Record<AccentColor, string> = {
-    blue: "text-blue-300",
-    green: "text-green-300",
-    yellow: "text-yellow-300",
-    purple: "text-purple-300",
-  };
-
-  const [copied, setCopied] = useState(false);
-  const handleCopy = async (value: string) => {
-    await navigator.clipboard.writeText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1000);
+    blue: "text-sky-400",
+    green: "text-emerald-400",
+    yellow: "text-amber-400",
+    purple: "text-violet-400",
   };
 
   const dumpLoadingRef = useRef(false);
@@ -482,10 +471,10 @@ function ConsensusStatePage() {
   }, [event?.step, paused, fetchDumpConsensus, heightParam]);
 
 
-  const cards: { label: string; value: string | number; accent: AccentColor }[] = [
-    { label: heightParam ? "Target Height" : "Latest Height", value: height || "—", accent: "blue" },
+  const cards: { label: string; value: string | number; accent: AccentColor; animate?: boolean }[] = [
+    { label: heightParam ? "Target Height" : "Latest Height", value: height ? height.toLocaleString() : "—", accent: "blue", animate: true },
     ...(heightParam ? [
-      { label: "Latest Height", value: eventRaw?.height || "Loading...", accent: "blue" as AccentColor }
+      { label: "Latest Height", value: eventRaw?.height ? Number(eventRaw.height).toLocaleString() : "Loading...", accent: "blue" as AccentColor }
     ] : []),
     { label: heightParam ? "Round" : "Voting Round", value: round ?? "—", accent: "green" },
     ...(heightParam ? [
@@ -515,39 +504,51 @@ function ConsensusStatePage() {
     ])
   ];
 
+  const proposerAddr = dumpConsensus?.result?.round_state?.proposer?.address;
+  const proposerObj = dumpConsensus?.result?.round_state?.validators?.validators?.find?.((v: any) => v.address === proposerAddr);
+  const blockProposerAddr = dumpConsensus?.result?.round_state?.proposal_block?.header?.proposer_address;
+
   return (
-    <div className="min-h-screen bg-[#0f1115] text-gray-200 flex flex-col overflow-x-hidden">
+    <div className="min-h-screen flex flex-col overflow-x-hidden">
       <SupportUS />
 
-      {/* Navbar */}
       <Navbar shrink={false} />
 
-      <main className="flex-1 mt-4 px-4 sm:px-8">
-        <section className="p-4 sm:p-8 mx-auto bg-[#1a1e24] rounded-xl shadow-lg">
-          <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+      <main className="flex-1">
+        <section className="mx-auto max-w-[1600px] px-4 sm:px-6 pb-8">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 pt-6 pb-6 animate-rise">
+            <div className="flex items-center gap-3">
               {heightParam && (
                 <button
                   onClick={() => {
                     setSearchInput("");
                     window.location.href = "/consensus";
                   }}
-                  className="mr-2 p-2 text-gray-400 hover:text-white transition-colors"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--edge)] bg-[var(--bg-panel)] text-slate-400 transition-all hover:border-cyan-400/40 hover:text-white"
                   title="Go to live consensus page"
                 >
-                  <FontAwesomeIcon icon={faArrowLeft} size="lg" />
+                  <ArrowLeft size={16} />
                 </button>
               )}
-              <h1 className="text-2xl font-bold text-white">Consensus State</h1>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight text-white">
+                  Consensus <span className="text-gradient">State</span>
+                </h1>
+                <p className="mt-1 text-sm text-slate-500">
+                  {heightParam ? `Historical view for block ${Number(heightParam).toLocaleString()}` : "Validator voting in real time"}
+                </p>
+              </div>
 
               {NETWORK_NAME && (
-                <span className="text-sm font-medium text-blue-300 bg-blue-900/30 rounded px-3 py-1 border border-blue-600">
+                <span className="chip hidden md:inline-flex">
+                  {!heightParam && <span className="live-dot" />}
                   {NETWORK_NAME}
                 </span>
               )}
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <div className="relative group">
                 <input
                   type="text"
@@ -557,15 +558,15 @@ function ConsensusStatePage() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleSearch();
                   }}
-                  className="bg-[#0f1115] border border-gray-700 rounded-lg px-4 py-1.5 pl-10 text-sm focus:outline-none focus:border-blue-500 transition-all w-48 sm:w-64"
+                  className="w-48 rounded-lg border border-[var(--edge)] bg-[var(--bg-panel)] py-2 pl-9 pr-20 text-sm text-white placeholder:text-slate-600 transition-all focus:border-cyan-400/50 focus:outline-none focus:ring-2 focus:ring-cyan-400/10 sm:w-64"
                 />
-                <FontAwesomeIcon
-                  icon={faSearch}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors pointer-events-none"
+                <Search
+                  size={15}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 transition-colors group-focus-within:text-cyan-400"
                 />
                 <button
                   onClick={handleSearch}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-xs bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded transition-colors"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md bg-cyan-500/15 px-2.5 py-1 text-xs font-semibold text-cyan-300 transition-colors hover:bg-cyan-500/25 cursor-pointer"
                 >
                   Search
                 </button>
@@ -581,75 +582,61 @@ function ConsensusStatePage() {
                       setPaused(true);
                     }
                   }}
-                  className={`px-3 py-1.5 rounded font-semibold hover:cursor-pointer transition-colors ${paused ? "bg-green-700 hover:bg-green-600 text-white" : "bg-red-700 hover:bg-red-600 text-white"
+                  className={`flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-semibold transition-all cursor-pointer ${paused
+                    ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/20"
+                    : "border-rose-400/30 bg-rose-400/10 text-rose-300 hover:bg-rose-400/20"
                     }`}
                 >
+                  {paused ? <Play size={14} /> : <Pause size={14} />}
                   {paused ? "Resume" : "Pause"}
                 </button>
               )}
             </div>
           </div>
 
-
-          <div className="mx-auto mb-8">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold text-cyan-300">
-                Consensus Progress for {heightParam ? "Historical" : "Current"} Block{height ? ` (${height.toLocaleString()})` : ""}
+          {/* Consensus progress */}
+          <div className="card p-6 mb-6 animate-rise">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="section-title">
+                Consensus Progress {height ? `· Block ${height.toLocaleString()}` : ""}
               </h2>
-              <span className="text-sm font-semibold text-white bg-blue-600/20 px-3 py-1 rounded border border-blue-500/30">{currentStep}</span>
+              <span className="chip !text-cyan-300 !border-cyan-400/25 !bg-cyan-400/[0.07]">{currentStep || "—"}</span>
             </div>
             <div className="flex flex-col items-center w-full">
               <div className="relative w-full h-5 flex items-center">
-                <div className="absolute left-0 top-0 w-full h-3 bg-gray-700 rounded-full" />
+                <div className="absolute left-0 top-1 w-full h-2.5 rounded-full bg-white/[0.05] border border-[var(--edge)]" />
 
                 <div
-                  className={`absolute left-0 top-0 h-3 rounded-full transition-all duration-700 ${blockFlash ? "ring-4 ring-blue-300" : ""
-                    }`}
-                  style={{
-                    width: `${progressFill}%`,
-                    background: "linear-gradient(90deg, #3B82F6 0%, #8B5CF6 100%)",
-                  }}
+                  className={`progress-live absolute left-0 top-1 h-2.5 rounded-full transition-all duration-700 ${blockFlash ? "ring-4 ring-cyan-300/40" : ""}`}
+                  style={{ width: `${progressFill}%` }}
                 />
                 {/* Step markers */}
                 {stepLabels.map((step) => (
                   <div
                     key={step.percent}
-                    className="absolute top-1/3 -translate-y-1/2"
-                    style={{ left: `calc(${step.percent}% - 8px)` }}
+                    className="absolute top-[9px] -translate-y-1/2"
+                    style={{ left: `calc(${step.percent}% - 10px)` }}
                   >
                     <div
-                      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all duration-700 ${progressFill >= step.percent
-                        ? "bg-blue-500 border-blue-600"
-                        : "bg-[#1a1e24] border-gray-600"
+                      className={`w-5 h-5 rounded-full flex items-center justify-center transition-all duration-500 ${progressFill >= step.percent
+                        ? "bg-gradient-to-br from-cyan-400 to-emerald-400 shadow-[0_0_12px_rgba(34,211,238,0.5)]"
+                        : "bg-[#0c1220] border-2 border-slate-700"
                         }`}
                     >
                       {progressFill >= step.percent && (
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 12 12"
-                          fill="none"
-                        >
-                          <path
-                            d="M3 6.5L5.5 9L9 4"
-                            stroke="#fff"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
+                        <Check size={11} strokeWidth={3.5} className="text-[#05080f]" />
                       )}
                     </div>
                   </div>
                 ))}
               </div>
-              <div className="flex w-full justify-between mt-2 text-xs text-gray-400">
+              <div className="flex w-full justify-between mt-3 text-xs">
                 {stepLabels.map((step) => (
                   <span
                     key={step.label}
-                    className={`w-1/4 text-center ${progressFill >= step.percent
-                      ? "font-semibold text-white"
-                      : "text-gray-500"
+                    className={`w-1/4 text-center transition-colors duration-500 ${progressFill >= step.percent
+                      ? "font-semibold text-cyan-300"
+                      : "text-slate-600"
                       }`}
                   >
                     {step.label}
@@ -659,119 +646,93 @@ function ConsensusStatePage() {
             </div>
           </div>
 
-          <div className="relative mb-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 text-white font-sans">
-              {cards.map(({ label, value, accent }) => (
-                <div
-                  key={label}
-                  className="bg-[#1a1e24] rounded-lg px-5 py-4 border border-[#2a2f3a] hover:border-cyan-400 transition shadow-sm"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-medium text-zinc-500/90">{label}</h3>
-                  </div>
-                  <div
-                    className={`text-2xl font-mono font-bold leading-tight truncate ${colorMap[accent]}`}
-                    title={value.toString()}
-                  >
-                    {value}
-                  </div>
-                </div>
-              ))}
+          {/* Stat cards */}
+          <div className="stagger grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            {cards.map(({ label, value, accent, animate }) => (
               <div
-                key="proposer"
-                className="bg-[#1a1e24] col-span-2 rounded-lg px-5 py-4 border border-[#2a2f3a] hover:border-cyan-400 transition shadow-sm"
+                key={label}
+                className="card card-hover px-5 py-4"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium text-teal-400">Proposer</h3>
-                </div>
+                <h3 className="section-title mb-2">{label}</h3>
                 <div
-                  className={`text-2xl font-mono font-bold leading-tight truncate text-purple-300`}
-                  title="Proposer"
+                  className={`text-2xl font-mono font-bold leading-tight truncate ${colorMap[accent]}`}
+                  title={value.toString()}
                 >
-
-                  {proposer &&
-                    <>
-                      <span className='text-cyan-400 text-md hover:cursor-pointer'
-                        onClick={() => handleCopy(proposer)}
-                      >{shorten(proposer, 12)}</span>&nbsp;
-                      <button
-                        onClick={() => handleCopy(proposer)}
-                        title="Copy"
-                        style={{
-                          cursor: 'pointer',
-                          background: 'none',
-                          border: 'none',
-                          padding: 0,
-                        }}
-                        className="text-gray-600"
-                        aria-label="Copy to clipboard"
-                      >
-                        <FontAwesomeIcon icon={copied ? faCheck : faClipboard} />
-                      </button>
-                    </>
-                  }
+                  <span key={animate ? String(value) : undefined} className={animate ? "animate-value" : undefined}>
+                    {value}
+                  </span>
                 </div>
+              </div>
+            ))}
+            <div
+              key="proposer"
+              className="card card-hover col-span-1 sm:col-span-2 px-5 py-4"
+            >
+              <h3 className="section-title mb-2">Proposer</h3>
+              <div className="text-xl font-mono font-bold leading-tight truncate">
+                {proposer ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="text-cyan-400">{shorten(proposer, 12)}</span>
+                    <CopyButton value={proposer} />
+                  </span>
+                ) : (
+                  <span className="text-slate-600">—</span>
+                )}
               </div>
             </div>
-
           </div>
+
           {/* Proposer Info Section */}
-
-          {(() => {
-            const proposerAddr = dumpConsensus?.result?.round_state?.proposer?.address;
-            const proposerObj = dumpConsensus?.result?.round_state?.validators?.validators?.find?.((v: any) => v.address === proposerAddr);
-            const blockProposerAddr = dumpConsensus?.result?.round_state?.proposal_block?.header?.proposer_address;
-
-            return proposerAddr ? (
-              <div className="bg-[#1a1e24] rounded-lg p-4 shadow-inner mb-8 border border-gray-700">
-                <h3 className="text-lg font-semibold mb-4 text-cyan-300">Current Proposer Info</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-300">
-                  <div>
-                    <span className="text-gray-500">Proposer Address</span>
-                    <div className="font-mono flex items-center gap-1 text-gray-100">
-                      {proposerAddr}&nbsp;
-                      <CopyButton value={proposerAddr} />
-                    </div>
+          {proposerAddr ? (
+            <div className="card p-6 mb-6 animate-rise">
+              <h3 className="section-title mb-5">Current Proposer Info</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-sm">
+                <div>
+                  <span className="text-xs text-slate-500">Proposer Address</span>
+                  <div className="mt-1 flex items-center gap-1.5 font-mono text-slate-200 break-all">
+                    {proposerAddr}
+                    <CopyButton value={proposerAddr} />
                   </div>
-                  <div>
-                    <span className="text-gray-500">Voting Power</span>
-                    <div className="font-mono text-gray-100">
-                      {proposerObj?.voting_power ?? '—'}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Proposer Priority</span>
-                    <div className="font-mono text-gray-100">
-                      {proposerObj?.proposer_priority ?? '—'}
-                    </div>
-                  </div>
-                  {blockProposerAddr && (
-                    <div>
-                      <span className="text-gray-500">Block Proposer Address</span>
-                      <div className="font-mono flex items-center gap-1 text-gray-100">
-                        {blockProposerAddr}
-                        <CopyButton value={blockProposerAddr} />
-                      </div>
-                    </div>
-                  )}
                 </div>
+                <div>
+                  <span className="text-xs text-slate-500">Voting Power</span>
+                  <div className="mt-1 font-mono text-slate-200">
+                    {proposerObj?.voting_power ? Number(proposerObj.voting_power).toLocaleString() : '—'}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-xs text-slate-500">Proposer Priority</span>
+                  <div className="mt-1 font-mono text-slate-200">
+                    {proposerObj?.proposer_priority ?? '—'}
+                  </div>
+                </div>
+                {blockProposerAddr && (
+                  <div>
+                    <span className="text-xs text-slate-500">Block Proposer Address</span>
+                    <div className="mt-1 flex items-center gap-1.5 font-mono text-slate-200 break-all">
+                      {blockProposerAddr}
+                      <CopyButton value={blockProposerAddr} />
+                    </div>
+                  </div>
+                )}
               </div>
-            ) : null;
-          })()}
+            </div>
+          ) : null}
 
           {/* Validators Table Section */}
-          <div className="relative">
+          <div className="animate-rise">
             <div className="mb-4 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-cyan-300">Validators State</h2>
+              <h2 className="text-lg font-bold text-white">Validators State</h2>
+              <span className="chip">{validators.length} validators</span>
             </div>
 
-            <div className="relative overflow-x-auto border border-gray-700 rounded-lg">
-              <table className="w-full bg-[#1a1e24] rounded-lg overflow-hidden">
-                <thead className="bg-gray-800 text-gray-400 text-xs uppercase">
+            <div className="card overflow-x-auto">
+              <table className="tbl">
+                <thead>
                   <tr>
-                    <th className="px-4 py-2 text-left">Favourite</th>
+                    <th className="w-12">Fav</th>
                     <th
-                      className="px-4 py-2 text-left cursor-pointer"
+                      className="cursor-pointer select-none hover:!text-slate-300 transition-colors"
                       title="Sort by moniker (or address if missing)"
                       onClick={() =>
                         setSortConfig((prev) => ({
@@ -784,14 +745,14 @@ function ConsensusStatePage() {
                         Validator Address
                         {sortConfig.key === "address" &&
                           (sortConfig.direction === "desc" ? (
-                            <svg className="inline w-4 h-4 ml-1" viewBox="0 0 16 16" fill="none"><path d="M8 11L3 6h10L8 11z" fill="#38bdf8" /></svg>
+                            <ChevronDown size={13} className="text-cyan-400" />
                           ) : (
-                            <svg className="inline w-4 h-4 ml-1" viewBox="0 0 16 16" fill="none"><path d="M8 5l5 5H3l5-5z" fill="#38bdf8" /></svg>
+                            <ChevronUp size={13} className="text-cyan-400" />
                           ))}
                       </span>
                     </th>
                     <th
-                      className="px-4 py-2 text-left cursor-pointer"
+                      className="cursor-pointer select-none hover:!text-slate-300 transition-colors"
                       title="Sort by voting power (%)"
                       onClick={() =>
                         setSortConfig((prev) => ({
@@ -804,20 +765,20 @@ function ConsensusStatePage() {
                         Voting Power
                         {sortConfig.key === "votingPower" &&
                           (sortConfig.direction === "desc" ? (
-                            <svg className="inline w-4 h-4 ml-1" viewBox="0 0 16 16" fill="none"><path d="M8 11L3 6h10L8 11z" fill="#38bdf8" /></svg>
+                            <ChevronDown size={13} className="text-cyan-400" />
                           ) : (
-                            <svg className="inline w-4 h-4 ml-1" viewBox="0 0 16 16" fill="none"><path d="M8 5l5 5H3l5-5z" fill="#38bdf8" /></svg>
+                            <ChevronUp size={13} className="text-cyan-400" />
                           ))}
                       </span>
                     </th>
-                    <th className="px-4 py-2 text-left">Cumulative Voting Power</th>
-                    <th className="px-4 py-2 text-left">Voted</th>
-                    {!heightParam && <th className="px-4 py-2 text-left">Precommit</th>}
-                    {!heightParam && <th className="px-4 py-2 text-left">Latest Round</th>}
+                    <th>Cumulative Voting Power</th>
+                    <th>Voted</th>
+                    {!heightParam && <th>Precommit</th>}
+                    {!heightParam && <th>Latest Round</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedValidators.map((v, idx) => {
+                  {sortedValidators.map((v) => {
                     const votingPower = Number(v.votingPower);
                     const votingPowerPercent = totalVotingPower ? ((votingPower / totalVotingPower) * 100).toFixed(2) : "0.00";
                     cumulative += votingPower;
@@ -835,35 +796,62 @@ function ConsensusStatePage() {
                       precommitted = precommitted || (typeof latestVoteSet.precommits?.[originalIdx] === 'string' && !latestVoteSet.precommits[originalIdx].startsWith('nil'));
                     }
 
-                    const rowColor = heightParam
-                      ? (idx % 2 === 0 ? "bg-[#1a1e24]" : "bg-[#21262d]")
-                      : favourites.includes(v.address)
-                        ? "bg-cyan-900"
-                        : voted
-                          ? "bg-green-900"
-                          : "bg-gray-900";
+                    const isFav = favourites.includes(v.address);
+                    const rowClass = isFav
+                      ? "!bg-cyan-400/[0.06]"
+                      : voted && !heightParam
+                        ? "!bg-emerald-400/[0.04]"
+                        : "";
 
                     return (
-                      <tr key={v.address} className={`${rowColor} text-gray-100`}>
-                        <td className="px-4 py-2 text-center">
+                      <tr key={`${v.address}-${originalIdx}`} className={rowClass}>
+                        <td className="text-center">
                           <button
-                            aria-label={favourites.includes(v.address) ? "Unfavourite" : "Favourite"}
+                            aria-label={isFav ? "Unfavourite" : "Favourite"}
                             onClick={() => toggleFavourite(v.address)}
-                            className="text-xl text-yellow-400 focus:outline-none"
+                            className="focus:outline-none cursor-pointer transition-transform hover:scale-110"
                           >
-                            {favourites.includes(v.address) ? "★" : "☆"}
+                            <Star
+                              size={15}
+                              className={isFav ? 'fill-amber-400 text-amber-400' : 'text-slate-600 hover:text-amber-400'}
+                            />
                           </button>
                         </td>
-                        <td className="px-4 py-2 font-mono text-sm flex items-left gap-1"
-                          title={v.address}
-                        >
-                          {monikers.get(v.address) || v.address}&nbsp;<CopyButton value={v.address} />
+                        <td className="font-mono text-[13px] text-slate-200" title={v.address}>
+                          <span className="inline-flex items-center gap-1.5">
+                            {monikers.get(v.address) || shorten(v.address, 10)}
+                            <CopyButton value={v.address} />
+                          </span>
                         </td>
-                        <td className="px-4 py-2">{votingPowerPercent}%</td>
-                        <td className="px-4 py-2">{cumulativePercent}%</td>
-                        <td className="px-4 py-2 text-center">{voted ? "✅" : "❌"}</td>
-                        {!heightParam && <td className="px-4 py-2 text-center">{precommitted ? "✅" : "❌"}</td>}
-                        {!heightParam && <td className="px-4 py-2 text-center">{round}</td>}
+                        <td>
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/[0.06]">
+                              <div
+                                className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-500"
+                                style={{ width: `${Math.min(100, Number(votingPowerPercent) * 4)}%` }}
+                              />
+                            </div>
+                            <span className="font-mono text-xs">{votingPowerPercent}%</span>
+                          </div>
+                        </td>
+                        <td className="font-mono text-xs">{cumulativePercent}%</td>
+                        <td>
+                          {voted ? (
+                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-400"><Check size={13} strokeWidth={3} /></span>
+                          ) : (
+                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-400/10 text-rose-400/70"><XIcon size={13} strokeWidth={3} /></span>
+                          )}
+                        </td>
+                        {!heightParam && (
+                          <td>
+                            {precommitted ? (
+                              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-400"><Check size={13} strokeWidth={3} /></span>
+                            ) : (
+                              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-400/10 text-rose-400/70"><XIcon size={13} strokeWidth={3} /></span>
+                            )}
+                          </td>
+                        )}
+                        {!heightParam && <td className="font-mono text-center">{round}</td>}
                       </tr>
                     );
                   })}
@@ -874,28 +862,28 @@ function ConsensusStatePage() {
 
           {/* Votes by Round Section */}
           {dumpLoading ? (
-            <div className="text-gray-400 mt-6">Loading votes by round...</div>
+            <div className="text-slate-500 mt-6">Loading votes by round...</div>
           ) : dumpError ? (
-            <div className="text-red-400 mt-6">Error loading votes: {dumpError}</div>
+            <div className="text-rose-400 mt-6">Error loading votes: {dumpError}</div>
           ) : Array.isArray(dumpConsensus?.result?.round_state?.votes) &&
           dumpConsensus.result.round_state.votes.length > 0 && (
-            <div className="bg-[#1a1e24] border border-gray-700 rounded-lg p-4 shadow-inner mt-8">
-              <h3 className="text-lg font-semibold mb-2 text-cyan-300">Votes by Round</h3>
+            <div className="card p-6 mt-6 animate-rise">
+              <h3 className="section-title mb-4">Votes by Round</h3>
               <div className="overflow-x-auto">
-                <table className="min-w-full text-xs text-gray-200">
+                <table className="tbl !text-xs">
                   <thead>
-                    <tr className="bg-gray-800 text-gray-400">
-                      <th className="px-2 py-2 text-left">Round</th>
-                      <th className="px-2 py-2 text-left">Prevotes Bit Array</th>
-                      <th className="px-2 py-2 text-left">Precommits Bit Array</th>
+                    <tr>
+                      <th>Round</th>
+                      <th>Prevotes Bit Array</th>
+                      <th>Precommits Bit Array</th>
                     </tr>
                   </thead>
                   <tbody>
                     {dumpConsensus.result.round_state.votes.map((vote: any, idx: number) => (
-                      <tr key={idx} className="border-b border-gray-700 last:border-b-0">
-                        <td className="px-2 py-1 font-mono">{vote.round ?? idx}</td>
-                        <td className="px-2 py-1 font-mono break-all">{vote.prevotes_bit_array || '—'}</td>
-                        <td className="px-2 py-1 font-mono break-all">{vote.precommits_bit_array || '—'}</td>
+                      <tr key={idx}>
+                        <td className="font-mono">{vote.round ?? idx}</td>
+                        <td className="font-mono !whitespace-normal break-all text-slate-500">{vote.prevotes_bit_array || '—'}</td>
+                        <td className="font-mono !whitespace-normal break-all text-slate-500">{vote.precommits_bit_array || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -911,14 +899,14 @@ function ConsensusStatePage() {
       <Footer />
 
       {errorMsg && (
-        <div className="fixed bottom-4 right-4 bg-red-600/90 text-white px-6 py-3 rounded shadow-lg z-50 flex items-center gap-3">
-          <span>{errorMsg}</span>
-          <button onClick={() => setErrorMsg(null)} className="text-white hover:text-gray-200 text-xl leading-none">
-            &times;
+        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3 rounded-xl border border-rose-500/30 bg-[#160a10]/95 px-5 py-3 text-rose-200 shadow-[0_16px_48px_rgba(0,0,0,0.6)] backdrop-blur-xl animate-rise">
+          <span className="text-sm">{errorMsg}</span>
+          <button onClick={() => setErrorMsg(null)} className="rounded p-1 text-rose-400 transition-colors hover:bg-white/[0.06] hover:text-white">
+            <XIcon size={14} />
           </button>
         </div>
       )}
-    </div >
+    </div>
 
   );
 }

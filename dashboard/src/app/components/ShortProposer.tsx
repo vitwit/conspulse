@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import { ShortNameProps } from './ShortName';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -5,6 +7,10 @@ import { faClipboard, faCheck } from '@fortawesome/free-solid-svg-icons';
 
 export default function ShortProposerName({ value, maxLength, iconColor = "text-gray-600" }: ShortNameProps) {
     const [copied, setCopied] = useState(false);
+
+    if (!value) {
+        return <span className="text-slate-500">—</span>;
+    }
 
     const shorten = (str: string, chars = 6): string => {
         if (!str) return '';
