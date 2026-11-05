@@ -161,7 +161,6 @@ const PeersTableTab: React.FC<Props> = ({
                                         className={`
                                             hover:bg-[#2e3440]
                                             border-b border-[#2a2f3a]
-                                            ${updatedRows.has(node.address) ? 'animate-fadeGreen' : ''}
                                             ${favoriteNodes.has(node.address) ? 'bg-[#3b4252]' : ''}
                                         `}
                                     >
