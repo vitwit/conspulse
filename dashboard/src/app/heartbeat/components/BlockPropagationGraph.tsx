@@ -1,4 +1,3 @@
-import React from "react";
 import { Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -75,7 +74,7 @@ export function BlockPropagationGraph({
         display: true,
         beginAtZero: true,
         ticks: {
-          stepSize: 100,
+          maxTicksLimit: 10,
         },
         grid: {
           display: false,

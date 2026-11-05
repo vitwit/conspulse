@@ -8,14 +8,15 @@ interface Props {
     nodeId: string;
     address: string;
     explorerUrl: string;
+    nameColorClass?: string;
 }
 
 const formatNodeId = (nodeId: string): string => {
     if (!nodeId) return '';
-    return nodeId.length > 25 ? `${nodeId.slice(0, 25)}...` : nodeId;
+    return nodeId.length > 20 ? `${nodeId.slice(0, 10)}...${nodeId.slice(-6)}` : nodeId;
 };
 
-const NodeIdentityCell: React.FC<Props> = ({ moniker, nodeId, address, explorerUrl }) => {
+const NodeIdentityCell: React.FC<Props> = ({ moniker, nodeId, address, explorerUrl, nameColorClass = 'text-green-400' }) => {
     const shortAddress = `${address.slice(0,6)}...${address.slice(-6,)}`;
     const [copied, setCopied] = useState(false);
 
@@ -40,14 +41,14 @@ const NodeIdentityCell: React.FC<Props> = ({ moniker, nodeId, address, explorerU
                         href={`${explorerUrl}/0x${address}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="hover:underline text-green-400 font-medium"
+                        className={`hover:underline font-medium ${nameColorClass}`}
                         title="View in explorer"
                     >
                         {formatNodeId(nodeId) || formatNodeId(moniker)}
                     </a>
                     <FontAwesomeIcon
                         icon={faExternalLink}
-                        className="text-green-400 opacity-70 cursor-pointer hover:opacity-100"
+                        className={`opacity-70 cursor-pointer hover:opacity-100 ${nameColorClass}`}
                         title="Open in explorer"
                         onClick={() => window.open(`${explorerUrl}/0x${address}`, '_blank')}
                     />

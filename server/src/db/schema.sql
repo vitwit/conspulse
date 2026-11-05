@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS node_stats
 )
 ENGINE = ReplacingMergeTree(updatedAt)
 PARTITION BY toYYYYMM(blockTime)
-ORDER BY (address, height);
+ORDER BY (moniker, height);
 
 CREATE TABLE IF NOT EXISTS blocks (
     height UInt64,

@@ -194,7 +194,7 @@ export class Database {
     }
 
     async storeNodeStats(stats: NodeStats): Promise<void> {
-        const key = stats.nodeID || stats.address;
+        const key = stats.moniker;
         this.latestStats.set(key, stats);
 
         this.statsBuffer.push(stats);
@@ -285,7 +285,7 @@ export class Database {
 WITH ranked AS (
     SELECT
         *,
-        row_number() OVER (PARTITION BY address ORDER BY blockTime DESC) AS rn
+        row_number() OVER (PARTITION BY moniker ORDER BY blockTime DESC) AS rn
     FROM node_stats
 )
 

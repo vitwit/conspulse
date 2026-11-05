@@ -8,6 +8,7 @@ export type ShortNameProps = {
     value: string;
     maxLength: number;
     iconColor?: string;
+    displayValue?: string;
 };
 
 export default function ShortName({ value, maxLength, iconColor = "text-gray-600" }: ShortNameProps) {

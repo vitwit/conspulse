@@ -95,6 +95,14 @@ const PeersTableTab: React.FC<Props> = ({
         'Latency',
     ];
 
+    const getNodeHealthColor = (node: Stats): string => {
+        const heightLag = parseInt(currentHeight, 10) - node.latestBlockHeight;
+        const blockTimeLagSecs = (Date.now() - node.blockTime * 1000) / 1000;
+        if (heightLag > 25 || blockTimeLagSecs > 30) return 'text-red-500';
+        if (heightLag > 5 || blockTimeLagSecs > 15) return 'text-yellow-400';
+        return 'text-green-400';
+    };
+
     return (
         <div className="overflow-x-auto mb-8 scrollbar-hide">
             <table className="min-w-full text-sm text-left rounded-lg shadow-md">
@@ -143,10 +151,9 @@ const PeersTableTab: React.FC<Props> = ({
 
                                 return (
                                     <motion.tr
-                                        key={node.address || idx}
-                                        layout
-                                        initial="hidden"
-                                        animate="visible"
+                                        key={idx}
+                                        initial="initial"
+                                        animate="animate"
                                         exit="exit"
                                         variants={rowVariants}
                                         transition={{ duration: 0.3 }}
@@ -154,7 +161,6 @@ const PeersTableTab: React.FC<Props> = ({
                                         className={`
                                             hover:bg-[#2e3440]
                                             border-b border-[#2a2f3a]
-                                            ${updatedRows.has(node.address) ? 'animate-fadeGreen' : ''}
                                             ${favoriteNodes.has(node.address) ? 'bg-[#3b4252]' : ''}
                                         `}
                                     >
@@ -172,6 +178,7 @@ const PeersTableTab: React.FC<Props> = ({
                                                 nodeId={node.nodeID}
                                                 address={node.address}
                                                 explorerUrl={process.env.NEXT_PUBLIC_EXPLORER_URL || ""}
+                                                nameColorClass={getNodeHealthColor(node)}
                                             />,
 
                                             node.earliestBlockHeight.toLocaleString(),

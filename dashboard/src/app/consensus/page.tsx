@@ -9,6 +9,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { SupportUS } from "../components/SupportUs";
 import { useWebSocket } from "../context/WebsocketContext";
 import { Stats } from "../types/ws";
+import { useValidatorNames } from "../context/ValidatorNamesContext";
 import CopyButton from "../components/CopyButton";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faClipboard, faCheck, faSearch, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
@@ -113,6 +114,7 @@ function ConsensusStatePage() {
   const [round, setRound] = useState<number>(0);
 
   const { nodesStats } = useWebSocket();
+  const { stakingNames } = useValidatorNames();
 
   const [monikers, setMonikers] = useState<Map<string, string>>(new Map());
   useEffect(() => {
@@ -322,23 +324,28 @@ function ConsensusStatePage() {
         setPrevHeight(displayHeight);
 
         if (validators.length === 0) {
-           Promise.all([
-             fetch(`${RPC_URL}/validators?per_page=100&page=1`).then(r => r.json()).catch(() => null),
-             fetch(`${RPC_URL}/validators?per_page=100&page=2`).then(r => r.json()).catch(() => null)
-           ]).then(([valData1, valData2]) => {
-             let vals = valData1?.result?.validators || [];
-             if (valData2?.result?.validators) {
-                 vals = vals.concat(valData2.result.validators);
-             }
-             if (vals.length > 0) {
-                 setValidators(prev => prev.length === 0 ? vals.map((v: any) => ({
-                     address: v.address.toUpperCase(),
-                     votingPower: Number(v.voting_power),
-                     prevote: false,
-                     precommit: false,
-                 })) : prev);
-             }
-           });
+          fetch(`${RPC_URL}/validators?per_page=100&page=1`)
+            .then(r => r.json())
+            .catch(() => null)
+            .then(async (valData1) => {
+              let vals = valData1?.result?.validators || [];
+              if (vals.length === 100) {
+                const valData2 = await fetch(`${RPC_URL}/validators?per_page=100&page=2`)
+                  .then(r => r.json())
+                  .catch(() => null);
+                if (valData2?.result?.validators) {
+                  vals = vals.concat(valData2.result.validators);
+                }
+              }
+              if (vals.length > 0) {
+                setValidators(prev => prev.length === 0 ? vals.map((v: any) => ({
+                  address: v.address.toUpperCase(),
+                  votingPower: Number(v.voting_power),
+                  prevote: false,
+                  precommit: false,
+                })) : prev);
+              }
+            });
         }
         
         if (forceLive) {
@@ -693,7 +700,7 @@ function ConsensusStatePage() {
                     <>
                       <span className='text-cyan-400 text-md hover:cursor-pointer'
                         onClick={() => handleCopy(proposer)}
-                      >{shorten(proposer, 12)}</span>&nbsp;
+                      >{monikers.get(proposer) ?? stakingNames.get(proposer) ?? shorten(proposer, 12)}</span>&nbsp;
                       <button
                         onClick={() => handleCopy(proposer)}
                         title="Copy"
@@ -857,7 +864,7 @@ function ConsensusStatePage() {
                         <td className="px-4 py-2 font-mono text-sm flex items-left gap-1"
                           title={v.address}
                         >
-                          {monikers.get(v.address) || v.address}&nbsp;<CopyButton value={v.address} />
+                          {monikers.get(v.address) ?? stakingNames.get(v.address) ?? v.address}&nbsp;<CopyButton value={v.address} />
                         </td>
                         <td className="px-4 py-2">{votingPowerPercent}%</td>
                         <td className="px-4 py-2">{cumulativePercent}%</td>

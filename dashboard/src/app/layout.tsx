@@ -4,6 +4,7 @@ import "./globals.css";
 import { TendermintProvider } from "./context/TendermintListener";
 import { WebSocketProvider } from "./context/WebsocketContext";
 import { TendermintHistoryProvider } from "./context/TendermintHistoryListener";
+import { ValidatorNamesProvider } from "./context/ValidatorNamesContext";
 
 
 const geistSans = Geist({
@@ -71,13 +72,15 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${sourceSans3.variable} antialiased bg-[#0e1014]`}
       >
-        <TendermintProvider >
-          <TendermintHistoryProvider >
-            <WebSocketProvider>
-              {children}
-            </WebSocketProvider>
-          </TendermintHistoryProvider>
-        </TendermintProvider>
+        <ValidatorNamesProvider>
+          <TendermintProvider >
+            <TendermintHistoryProvider >
+              <WebSocketProvider>
+                {children}
+              </WebSocketProvider>
+            </TendermintHistoryProvider>
+          </TendermintProvider>
+        </ValidatorNamesProvider>
       </body>
     </html>
   );
