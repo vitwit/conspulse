@@ -35,6 +35,7 @@ import { useTendermint } from "./context/TendermintListener";
 import { isEqual } from "lodash";
 import ShortProposerName from "./components/ShortProposer";
 import DescriptionTooltip from "./components/DescriptionTooltip";
+import { useValidatorNames } from "./context/ValidatorNamesContext";
 
 const SORT_BY_KEY = 'heartbeatSortBy';
 const SORT_DIRECTION_KEY = 'heartbeatSortDirection';
@@ -87,6 +88,7 @@ export default function NetstatsPage() {
 
 
   const { networkStats, nodesStats, retries, error } = useWebSocket();
+  const { stakingNames } = useValidatorNames();
 
   const [height, setHeight] = useState<string>("");
   const [step, setStep] = useState<number>(0);
@@ -445,7 +447,9 @@ export default function NetstatsPage() {
     {
       title: "Proposer",
       description: "The validator currently proposing the current block",
-      value: ShortProposerName({ value: proposer, maxLength: 6 }) || "—",
+      value: proposer
+        ? <ShortProposerName value={proposer} maxLength={6} displayValue={nodes.find(n => n.address === proposer)?.moniker ?? stakingNames.get(proposer)} />
+        : "—",
       icon: User,
       accent: "cyan",
     },

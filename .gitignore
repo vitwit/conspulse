@@ -38,3 +38,4 @@ coverage/
 
 # Local
 *.local 
+.claude
