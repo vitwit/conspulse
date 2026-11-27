@@ -178,19 +178,32 @@ export class Database {
         }
     }
 
-    async broadcastStats(): Promise<void> {
+    private buildStatsMessage(): string {
         const statsList = Array.from(this.latestStats.values())
             .sort((a, b) => b.blockTime - a.blockTime);
-        const message = JSON.stringify({
+        return JSON.stringify({
             type: "node_stats",
             stats: statsList
         });
+    }
+
+    async broadcastStats(): Promise<void> {
+        const message = this.buildStatsMessage();
 
         for (const client of clients) {
             if (client.readyState === WebSocket.OPEN) {
                 client.send(message);
             }
         }
+    }
+
+    // Send the current stats snapshot to a single client. Used when a client
+    // (re)connects so it sees data immediately instead of waiting for the next
+    // broadcast, which only fires on the next node-stats flush.
+    sendStatsSnapshot(ws: WebSocket): void {
+        if (this.latestStats.size === 0) return;
+        if (ws.readyState !== WebSocket.OPEN) return;
+        ws.send(this.buildStatsMessage());
     }
 
     async storeNodeStats(stats: NodeStats): Promise<void> {

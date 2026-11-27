@@ -2,6 +2,7 @@ import { z } from 'zod';
 import db from '../db';
 import { config } from '../config';
 import formatZodErrors from '../utils/zod';
+import { secretsMatch } from '../utils/secret';
 import logger from '../logger/logger';
 import { blockCache } from './cache';
 
@@ -28,12 +29,12 @@ export const StatsSchema = z.object({
     transactions: z.number(),
     latency: z.number(),
 
-});
+}).strict(); // fail-closed: reject any unexpected field (e.g. a leaked key) instead of silently stripping it
 
 export const SubmitStatsSchema = z.object({
     secret: z.string().min(1),
     stats: StatsSchema,
-});
+}).strict();
 
 export const submitStats = async (
     req: any,
@@ -49,7 +50,7 @@ export const submitStats = async (
     }
 
     const { secret, stats } = result.data;
-    if (secret !== config.API_SECRET) {
+    if (!secretsMatch(secret, config.API_SECRET)) {
         return res.status(401).json({ message: 'Unauthorized' });
     }
 

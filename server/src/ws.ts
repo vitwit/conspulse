@@ -1,5 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import logger from './logger/logger';
+import db from './db';
 
 const MAX_CLIENTS = 5_000;
 export const clients = new Set<WebSocket>();
@@ -18,6 +19,14 @@ export function setupWebSocket(server: import('http').Server) {
 
         clients.add(ws);
         logger.info(`[WebSocket] client connected. Total: ${clients.size}`);
+
+        // Seed the newly connected client with the current snapshot so it
+        // renders data immediately instead of waiting for the next broadcast.
+        try {
+            db.sendStatsSnapshot(ws);
+        } catch (err) {
+            logger.error('Failed to send stats snapshot to new client:', err);
+        }
 
         ws.on('close', () => {
             clients.delete(ws);
