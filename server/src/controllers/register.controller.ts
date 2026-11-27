@@ -3,6 +3,7 @@ import { z } from 'zod';
 import db from '../db';
 import { config } from '../config';
 import formatZodErrors from '../utils/zod';
+import { secretsMatch } from '../utils/secret';
 
 export const NodeInfoSchema = z.object({
     id: z.string(),
@@ -14,12 +15,12 @@ export const NodeInfoSchema = z.object({
     pubkeyType: z.string(),
     pubkey: z.string(),
     isValidator: z.boolean(),
-});
+}).strict(); // fail-closed: reject any unexpected field (e.g. a leaked private key) instead of silently stripping it
 
 export const RegisterRequestSchema = z.object({
     secret: z.string().min(1),
     nodeInfo: NodeInfoSchema,
-});
+}).strict();
 
 export const registerNode = async (
     req: any,
@@ -35,7 +36,7 @@ export const registerNode = async (
     }
 
     const { secret, nodeInfo } = result.data;
-    if (secret !== config.API_SECRET) {
+    if (!secretsMatch(secret, config.API_SECRET)) {
         return res.status(401).json({ message: 'Unauthorized' });
     }
 

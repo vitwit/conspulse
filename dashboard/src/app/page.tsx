@@ -25,6 +25,7 @@ import { BlockPropagationGraph } from "./heartbeat/components/BlockPropagationGr
 import BarChart from "./heartbeat/components/Barchart";
 import { BitArrayCandles } from "./heartbeat/components/BitArrayCandles";
 import { ErrorAlert } from "./heartbeat/components/ErrorAlert";
+import { ToastAlert } from "./components/ToastAlert";
 import { timeAgo } from "./utils";
 import { useWebSocket } from './context/WebsocketContext';
 import { NetworkMessage, Stats } from "./types/ws";
@@ -87,7 +88,7 @@ export default function NetstatsPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>("asc");
 
 
-  const { networkStats, nodesStats, retries, error } = useWebSocket();
+  const { networkStats, nodesStats, error: wsError } = useWebSocket();
   const { stakingNames } = useValidatorNames();
 
   const [height, setHeight] = useState<string>("");
@@ -274,6 +275,10 @@ export default function NetstatsPage() {
   // one stable throttled function for the life of the component
   const applyStats = useRef(
     throttle((stats: Stats[]) => {
+      // Ignore empty broadcasts: the server keeps all reporting nodes in
+      // memory, so an empty list is always a transient (e.g. reconnect) and
+      // would otherwise flash the UI to "0 nodes".
+      if (!stats || stats.length === 0) return;
       if (!equal(prevStatsRef.current, stats)) {
         prevStatsRef.current = stats;
         setNodes(stats);
@@ -476,6 +481,10 @@ export default function NetstatsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Shown once per outage episode (wsError is reset on reconnect), so it
+          surfaces connection problems without spamming notifications. */}
+      {wsError && <ToastAlert key={wsError} type="error" message={wsError} />}
+
       <SupportUS />
 
       <Navbar shrink={false} />

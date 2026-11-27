@@ -90,6 +90,19 @@ const NodeVersionsChart: React.FC<NodeVersionsChartProps> = ({ versions }) => {
     },
   };
 
+  if (total === 0) {
+    return (
+      <div className="bg-[#1a1e24] text-white p-6 rounded-xl shadow-md border border-[#2a2f3a]">
+        <h2 className="text-xl font-semibold mb-5 text-cyan-300">
+          Node Versions Distribution
+        </h2>
+        <div className="flex items-center justify-center py-20 text-gray-400">
+          Waiting for node data…
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-[#1a1e24] text-white p-6 rounded-xl shadow-md border border-[#2a2f3a]">
       <h2 className="text-xl font-semibold mb-5 text-cyan-300">
